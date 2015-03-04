@@ -7,6 +7,9 @@ import (
 	"go/parser"
 	"go/token"
 	"io/ioutil"
+	"os"
+	"os/exec"
+	"syscall"
 )
 
 var contexts []PryContext
@@ -75,8 +78,22 @@ func main() {
 		fileText = fileText[0:context.Start+offset] + text + fileText[context.End+offset:]
 		offset = len(text) - (context.End - context.Start)
 	}
-	ioutil.WriteFile(*filePath+".go", ([]byte)(fileText), 0644)
+
+	tmpPath := *filePath + ".go"
+	ioutil.WriteFile(tmpPath, ([]byte)(fileText), 0644)
 	fmt.Println("DONE!")
+
+	binary, lookErr := exec.LookPath("go")
+	if lookErr != nil {
+		panic(lookErr)
+	}
+	args := []string{"go", "run", tmpPath}
+	env := os.Environ()
+	execErr := syscall.Exec(binary, args, env)
+	if execErr != nil {
+		panic(execErr)
+	}
+
 }
 
 func FilterVars(vars []string) []string {

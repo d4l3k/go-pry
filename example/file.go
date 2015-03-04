@@ -12,6 +12,7 @@ func X() bool {
 
 type Banana struct {
 	Name string
+	Cake []int
 }
 
 func (b Banana) Ly() string {
@@ -20,7 +21,8 @@ func (b Banana) Ly() string {
 
 func main() {
 	a := 1
-	b := Banana{"Jeoffry"}
+	b := Banana{"Jeoffry", []int{1, 2, 3}}
+	m := []int{1234}
 	if d := X(); d {
 		log.Println(d)
 		for i, j := range []int{1} {

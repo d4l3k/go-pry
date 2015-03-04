@@ -12,7 +12,7 @@ func Pry(v ...interface{}) {
 }
 
 func Apply(v map[string]interface{}) {
-	fmt.Println(v)
+	fmt.Printf("%#v\n", v)
 	// disable input buffering
 	exec.Command("stty", "-F", "/dev/tty", "cbreak", "min", "1").Run()
 	// do not display entered characters on the screen
@@ -41,18 +41,25 @@ func Apply(v map[string]interface{}) {
 					fmt.Println()
 					methods := make([]string, typeOf.NumMethod())
 					for i, _ := range methods {
-						methods[i] = typeOf.Method(i).Name
+						methods[i] = typeOf.Method(i).Name + "("
 					}
-					fmt.Println(typeOf.Name() + ": " + strings.Join(methods, " "))
+					fields := make([]string, typeOf.NumField())
+					for i, _ := range fields {
+						fields[i] = typeOf.Field(i).Name
+					}
+					fmt.Println(typeOf.Name() + ": " + strings.Join(fields, " ") + " " + strings.Join(methods, " "))
 				}
 			}
 		case 10: //ENTER
 			fmt.Println()
-			val, present := v[line]
-			if present {
-				fmt.Println(val)
-			} else if line != "" {
-				fmt.Println("ERROR: Invalid input!")
+			if line == "continue" || line == "exit" {
+				return
+			}
+			resp, err := InterpretString(v, line)
+			if err != nil {
+				fmt.Println("Error: ", err)
+			} else {
+				fmt.Printf("%#v\n", resp)
 			}
 			count += 1
 			line = ""
