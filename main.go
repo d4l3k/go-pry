@@ -52,11 +52,6 @@ func main() {
 	}
 	fmt.Println("FINAL VARS", vars, "FUNCS", funcs)
 
-	template, err := ioutil.ReadFile("pry.go.tmpl")
-	if err != nil {
-		panic(err)
-	}
-
 	fileTextBytes, err := ioutil.ReadFile(*filePath)
 	if err != nil {
 		panic(err)
@@ -74,7 +69,7 @@ func main() {
 			obj = obj + "\"" + v + "\": " + v + ", "
 		}
 		obj += "}"
-		text := "pry.Apply(" + obj + ")\n" + (string)(template)
+		text := "pry.Apply(" + obj + ")\n"
 		fileText = fileText[0:context.Start+offset] + text + fileText[context.End+offset:]
 		offset = len(text) - (context.End - context.Start)
 	}
