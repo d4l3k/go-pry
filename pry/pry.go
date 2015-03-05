@@ -56,23 +56,45 @@ func Apply(v map[string]interface{}) {
 	}
 	fmt.Println()
 
+	history := []string{}
+	currentPos := 0
+
 	line := ""
-	count := 1
+	count := 0
 	var b []byte = make([]byte, 1)
 	for {
-		fmt.Printf("\r[%d] go-pry> %s \033[1D", count, line)
+		fmt.Printf("\r[%d] go-pry> %s \033[1D", currentPos, line)
+		bPrev := b[0]
 		os.Stdin.Read(b)
 		switch b[0] {
 		default:
+			if bPrev == 27 && b[0] == 91 {
+				continue
+			}
 			line += string(b)
 		case 127: // Backspace
 			if len(line) > 0 {
 				line = line[:len(line)-1]
 			}
 		case 27: // ? These two happen on key press
-		case 91: // ?
 		case 65: // Up
+			currentPos -= 1
+			if currentPos < 0 {
+				currentPos = 0
+			}
+			if len(history) > 0 {
+				line = history[currentPos]
+			}
 		case 66: // Down
+			currentPos += 1
+			if len(history) < currentPos {
+				currentPos = len(history)
+			}
+			if len(history) == currentPos {
+				line = ""
+			} else {
+				line = history[currentPos]
+			}
 		case 67: // Right
 		case 68: // Left
 		case 9: //TAB
@@ -113,7 +135,9 @@ func Apply(v map[string]interface{}) {
 				respStr := Highlight(fmt.Sprintf("%#v", resp))
 				fmt.Printf("=> %s\n", respStr)
 			}
+			history = append(history, line)
 			count += 1
+			currentPos = count
 			line = ""
 		}
 	}

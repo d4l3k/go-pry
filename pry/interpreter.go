@@ -26,7 +26,9 @@ func InterpretExpr(scope Scope, expr ast.Expr) (interface{}, error) {
 	switch e := expr.(type) {
 	case *ast.Ident:
 		builtinScope := map[string]interface{}{
-			"nil": nil,
+			"nil":   nil,
+			"true":  true,
+			"false": false,
 		}
 		obj, exists := scope[e.Name]
 		if !exists {
@@ -81,6 +83,26 @@ func InterpretExpr(scope Scope, expr ast.Expr) (interface{}, error) {
 		default:
 			return nil, errors.New(fmt.Sprintf("Unknown basic literal %d", e.Kind))
 		}
+	case *ast.CompositeLit:
+		fmt.Printf("TODO COMPLIT %#v\n", e)
+		switch t := e.Type.(type) {
+		case *ast.ArrayType:
+			fmt.Printf("TYPE %#v\n", t)
+		}
+		return e, nil
+	case *ast.BinaryExpr:
+		x, err := InterpretExpr(scope, e.X)
+		if err != nil {
+			return nil, err
+		}
+		y, err := InterpretExpr(scope, e.Y)
+		if err != nil {
+			return nil, err
+		}
+
+		return ComputeBinaryOp(x, y, e.Op)
+	case *ast.ParenExpr:
+		return InterpretExpr(scope, e.X)
 	default:
 		return nil, errors.New(fmt.Sprintf("Unknown EXPR %T", e))
 	}
