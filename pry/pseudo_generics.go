@@ -546,3 +546,135 @@ func ComputeBinaryOp(xI, yI interface{}, op token.Token) (interface{}, error) {
 	}
 	return nil, errors.New(fmt.Sprintf("Unknown operation %#v between %#v and %#v", op, xI, yI))
 }
+
+func ComputeUnaryOp(xI interface{}, op token.Token) (interface{}, error) {
+	switch xI.(type) {
+	case bool:
+		x := xI.(bool)
+		switch op {
+		case token.NOT:
+			return !x, nil
+		}
+	case int:
+		x := xI.(int)
+		switch op {
+		case token.ADD:
+			return +x, nil
+		case token.SUB:
+			return -x, nil
+		}
+	case int8:
+		x := xI.(int8)
+		switch op {
+		case token.ADD:
+			return +x, nil
+		case token.SUB:
+			return -x, nil
+		}
+	case int16:
+		x := xI.(int16)
+		switch op {
+		case token.ADD:
+			return +x, nil
+		case token.SUB:
+			return -x, nil
+		}
+	case int32:
+		x := xI.(int32)
+		switch op {
+		case token.ADD:
+			return +x, nil
+		case token.SUB:
+			return -x, nil
+		}
+	case int64:
+		x := xI.(int64)
+		switch op {
+		case token.ADD:
+			return +x, nil
+		case token.SUB:
+			return -x, nil
+		}
+	case uint:
+		x := xI.(uint)
+		switch op {
+		case token.ADD:
+			return +x, nil
+		case token.SUB:
+			return -x, nil
+		}
+	case uint8:
+		x := xI.(uint8)
+		switch op {
+		case token.ADD:
+			return +x, nil
+		case token.SUB:
+			return -x, nil
+		}
+	case uint16:
+		x := xI.(uint16)
+		switch op {
+		case token.ADD:
+			return +x, nil
+		case token.SUB:
+			return -x, nil
+		}
+	case uint32:
+		x := xI.(uint32)
+		switch op {
+		case token.ADD:
+			return +x, nil
+		case token.SUB:
+			return -x, nil
+		}
+	case uint64:
+		x := xI.(uint64)
+		switch op {
+		case token.ADD:
+			return +x, nil
+		case token.SUB:
+			return -x, nil
+		}
+	case uintptr:
+		x := xI.(uintptr)
+		switch op {
+		case token.ADD:
+			return +x, nil
+		case token.SUB:
+			return -x, nil
+		}
+	case float32:
+		x := xI.(float32)
+		switch op {
+		case token.ADD:
+			return +x, nil
+		case token.SUB:
+			return -x, nil
+		}
+	case float64:
+		x := xI.(float64)
+		switch op {
+		case token.ADD:
+			return +x, nil
+		case token.SUB:
+			return -x, nil
+		}
+	case complex64:
+		x := xI.(complex64)
+		switch op {
+		case token.ADD:
+			return +x, nil
+		case token.SUB:
+			return -x, nil
+		}
+	case complex128:
+		x := xI.(complex128)
+		switch op {
+		case token.ADD:
+			return +x, nil
+		case token.SUB:
+			return -x, nil
+		}
+	}
+	return nil, errors.New(fmt.Sprintf("Unknown unary operation %#v on %#v", op, xI))
+}

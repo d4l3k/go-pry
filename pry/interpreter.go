@@ -13,6 +13,7 @@ import (
 
 type Scope map[string]interface{}
 
+// Interprets a string of go code and returns the result.
 func InterpretString(scope Scope, exprStr string) (interface{}, error) {
 
 	// TODO: Mild hack, should just parse string with wrapper
@@ -64,6 +65,7 @@ func InterpretString(scope Scope, exprStr string) (interface{}, error) {
 	return InterpretExpr(scope, expr)
 }
 
+// Interprets an ast.Expr and returns the value.
 func InterpretExpr(scope Scope, expr ast.Expr) (interface{}, error) {
 	//fmt.Printf("EXPR %#v\n", expr)
 
@@ -73,6 +75,10 @@ func InterpretExpr(scope Scope, expr ast.Expr) (interface{}, error) {
 			"nil":   nil,
 			"true":  true,
 			"false": false,
+		}
+		typ, err := StringToType(e.Name)
+		if err == nil {
+			return typ, err
 		}
 		obj, exists := scope[e.Name]
 		if !exists {
@@ -128,12 +134,25 @@ func InterpretExpr(scope Scope, expr ast.Expr) (interface{}, error) {
 			return nil, errors.New(fmt.Sprintf("Unknown basic literal %d", e.Kind))
 		}
 	case *ast.CompositeLit:
-		fmt.Printf("TODO COMPLIT %#v\n", e)
+		typ, err := InterpretExpr(scope, e.Type)
+		if err != nil {
+			return nil, err
+		}
 		switch t := e.Type.(type) {
 		case *ast.ArrayType:
-			fmt.Printf("TYPE %#v\n", t)
+			l := len(e.Elts)
+			slice := reflect.MakeSlice(typ.(reflect.Type), l, l)
+			for i, elem := range e.Elts {
+				elemValue, err := InterpretExpr(scope, elem)
+				if err != nil {
+					return nil, err
+				}
+				slice.Index(i).Set(reflect.ValueOf(elemValue))
+			}
+			return slice.Interface(), nil
+		default:
+			return nil, errors.New(fmt.Sprintf("Unknown composite literal %#v", t))
 		}
-		return e, nil
 	case *ast.BinaryExpr:
 		x, err := InterpretExpr(scope, e.X)
 		if err != nil {
@@ -145,6 +164,37 @@ func InterpretExpr(scope Scope, expr ast.Expr) (interface{}, error) {
 		}
 
 		return ComputeBinaryOp(x, y, e.Op)
+	case *ast.UnaryExpr:
+		x, err := InterpretExpr(scope, e.X)
+		if err != nil {
+			return nil, err
+		}
+		return ComputeUnaryOp(x, e.Op)
+	case *ast.ArrayType:
+		typ, err := InterpretExpr(scope, e.Elt)
+		if err != nil {
+			return nil, err
+		}
+		arrType := reflect.SliceOf(typ.(reflect.Type))
+		return arrType, nil
+	case *ast.IndexExpr:
+		X, err := InterpretExpr(scope, e.X)
+		if err != nil {
+			return nil, err
+		}
+		i, err := InterpretExpr(scope, e.Index)
+		if err != nil {
+			return nil, err
+		}
+		iVal, isInt := i.(int)
+		if !isInt {
+			return nil, errors.New(fmt.Sprintf("Index has to be an int not %T", i))
+		}
+		xVal := reflect.ValueOf(X)
+		if iVal >= xVal.Len() || iVal < 0 {
+			return nil, errors.New("slice index out of range")
+		}
+		return xVal.Index(iVal).Interface(), nil
 	case *ast.ParenExpr:
 		return InterpretExpr(scope, e.X)
 	default:
@@ -152,6 +202,38 @@ func InterpretExpr(scope Scope, expr ast.Expr) (interface{}, error) {
 	}
 }
 
+// Returns the reflect.Type corresponding to the type string provided. Ex: StringToType("int")
+func StringToType(str string) (reflect.Type, error) {
+	types := map[string]reflect.Type{
+		"bool":       reflect.TypeOf(true),
+		"byte":       reflect.TypeOf(byte(0)),
+		"rune":       reflect.TypeOf(rune(0)),
+		"string":     reflect.TypeOf(""),
+		"int":        reflect.TypeOf(int(0)),
+		"int8":       reflect.TypeOf(int8(0)),
+		"int16":      reflect.TypeOf(int16(0)),
+		"int32":      reflect.TypeOf(int32(0)),
+		"int64":      reflect.TypeOf(int64(0)),
+		"uint":       reflect.TypeOf(uint(0)),
+		"uint8":      reflect.TypeOf(uint8(0)),
+		"uint16":     reflect.TypeOf(uint16(0)),
+		"uint32":     reflect.TypeOf(uint32(0)),
+		"uint64":     reflect.TypeOf(uint64(0)),
+		"uintptr":    reflect.TypeOf(uintptr(0)),
+		"float32":    reflect.TypeOf(float32(0)),
+		"float64":    reflect.TypeOf(float64(0)),
+		"complex64":  reflect.TypeOf(complex64(0)),
+		"complex128": reflect.TypeOf(complex128(0)),
+		"error":      reflect.TypeOf(errors.New("")),
+	}
+	val, present := types[str]
+	if !present {
+		return nil, errors.New(fmt.Sprintf("Error type %#v is not in table.", str))
+	}
+	return val, nil
+}
+
+// Converts a slice of []reflect.Value to []interface{}
 func ValuesToInterfaces(vals []reflect.Value) []interface{} {
 	inters := make([]interface{}, len(vals))
 	for i, val := range vals {
