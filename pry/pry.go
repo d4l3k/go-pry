@@ -70,6 +70,30 @@ func Apply(v Scope) {
 		default:
 			if bPrev == 27 && b[0] == 91 {
 				continue
+			} else if bPrev == 91 {
+				switch b[0] {
+				case 66: // Down
+					currentPos += 1
+					if len(history) < currentPos {
+						currentPos = len(history)
+					}
+					if len(history) == currentPos {
+						line = ""
+					} else {
+						line = history[currentPos]
+					}
+				case 65: // Up
+					currentPos -= 1
+					if currentPos < 0 {
+						currentPos = 0
+					}
+					if len(history) > 0 {
+						line = history[currentPos]
+					}
+				case 67: // Right
+				case 68: // Left
+				}
+				continue
 			}
 			line += string(b)
 		case 127: // Backspace
@@ -77,26 +101,6 @@ func Apply(v Scope) {
 				line = line[:len(line)-1]
 			}
 		case 27: // ? These two happen on key press
-		case 65: // Up
-			currentPos -= 1
-			if currentPos < 0 {
-				currentPos = 0
-			}
-			if len(history) > 0 {
-				line = history[currentPos]
-			}
-		case 66: // Down
-			currentPos += 1
-			if len(history) < currentPos {
-				currentPos = len(history)
-			}
-			if len(history) == currentPos {
-				line = ""
-			} else {
-				line = history[currentPos]
-			}
-		case 67: // Right
-		case 68: // Left
 		case 9: //TAB
 			if len(line) == 0 {
 				fmt.Println()
