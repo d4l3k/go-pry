@@ -16,7 +16,6 @@ func Pry(v ...interface{}) {
 }
 
 func Apply(v map[string]interface{}) {
-	fmt.Printf("%#v\n", v)
 	// disable input buffering
 	exec.Command("stty", "-F", "/dev/tty", "cbreak", "min", "1").Run()
 	// do not display entered characters on the screen
@@ -26,7 +25,7 @@ func Apply(v map[string]interface{}) {
 
 	_, filePathRaw, lineNum, _ := runtime.Caller(1)
 	filePath := strings.TrimSuffix(filePathRaw, ".go")
-	fmt.Printf("From %s @ line %d :\n\n", filePath, lineNum)
+	fmt.Printf("\nFrom %s @ line %d :\n\n", filePath, lineNum)
 	file, err := ioutil.ReadFile(filePath)
 	if err != nil {
 		fmt.Println(err)
@@ -77,7 +76,13 @@ func Apply(v map[string]interface{}) {
 		case 67: // Right
 		case 68: // Left
 		case 9: //TAB
-			if len(line) > 0 && line[len(line)-1] == '.' {
+			if len(line) == 0 {
+				fmt.Println()
+				for k, _ := range v {
+					fmt.Print(k + " ")
+				}
+				fmt.Println()
+			} else if line[len(line)-1] == '.' {
 				val, present := v[line[:len(line)-1]]
 				if present {
 					typeOf := reflect.TypeOf(val)
@@ -95,6 +100,9 @@ func Apply(v map[string]interface{}) {
 			}
 		case 10: //ENTER
 			fmt.Println()
+			if len(line) == 0 {
+				continue
+			}
 			if line == "continue" || line == "exit" {
 				return
 			}
@@ -102,7 +110,8 @@ func Apply(v map[string]interface{}) {
 			if err != nil {
 				fmt.Println("Error: ", err)
 			} else {
-				fmt.Printf("%#v\n", resp)
+				respStr := Highlight(fmt.Sprintf("%#v", resp))
+				fmt.Printf("=> %s\n", respStr)
 			}
 			count += 1
 			line = ""

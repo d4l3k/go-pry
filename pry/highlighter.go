@@ -40,7 +40,7 @@ func Highlight(s string) string {
 		"uint9",
 		"uintptr",
 	}
-	s = HighlightWords(s, []string{"\\d+"}, highlightColor4, "\\W")
+	s = HighlightWords(s, []string{"\\d+", "nil", "true", "false"}, highlightColor4, "\\W")
 	s = HighlightWords(s, highlightKeywords, highlightColor1, "\\W")
 	s = HighlightWords(s, highlightTypes, highlightColor2, "\\W")
 	s = HighlightWords(s, highlightSymbols, highlightColor1, "")
@@ -52,12 +52,19 @@ func Highlight(s string) string {
 
 func HighlightWords(s string, words []string, color, edges string) string {
 	lE := len(edges) - strings.Count(edges, "\\")
+	s = " " + s + " "
 	for _, word := range words {
 		r, _ := regexp.Compile(edges + word + edges)
 		s = (string)(r.ReplaceAllFunc(([]byte)(s), func(b []byte) []byte {
 			bStr := string(b)
 			return []byte(bStr[0:lE] + ansi.Color(bStr[lE:len(bStr)-lE], color) + bStr[len(bStr)-lE:])
 		}))
+	}
+	if s[0] == ' ' {
+		s = s[1:]
+	}
+	if s[len(s)-1] == ' ' {
+		s = s[:len(s)-1]
 	}
 	return s
 }

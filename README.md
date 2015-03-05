@@ -5,6 +5,8 @@ go-pry - an interactive REPL for Go that allows you to drop into your code at an
 ![go-pry](https://i.imgur.com/yr1BEsK.png)
 
 
+
+
 ## Usage
 Install go-pry
 ```bash
@@ -31,6 +33,9 @@ Run the code
 go-pry <go file>
 ```
 
+## Inspiration
+
+go-pry is greatly inspired by [Pry REPL](pryrepl.org) for Ruby.
 
 ## License
 

@@ -5,7 +5,9 @@ import (
 	"fmt"
 	"go/ast"
 	"go/parser"
+	"go/token"
 	"reflect"
+	"strconv"
 )
 
 type Scope map[string]interface{}
@@ -23,9 +25,15 @@ func InterpretExpr(scope Scope, expr ast.Expr) (interface{}, error) {
 
 	switch e := expr.(type) {
 	case *ast.Ident:
+		builtinScope := map[string]interface{}{
+			"nil": nil,
+		}
 		obj, exists := scope[e.Name]
 		if !exists {
-			return nil, errors.New(fmt.Sprint("Can't find EXPR ", e.Name))
+			obj, exists = builtinScope[e.Name]
+			if !exists {
+				return nil, errors.New(fmt.Sprint("Can't find EXPR ", e.Name))
+			}
 		}
 		return obj, nil
 	case *ast.SelectorExpr:
@@ -60,6 +68,19 @@ func InterpretExpr(scope Scope, expr ast.Expr) (interface{}, error) {
 		// TODO CALL WITH ARGS
 		values := funVal.Call([]reflect.Value{})
 		return ValuesToInterfaces(values)[0], nil
+	case *ast.BasicLit:
+		switch e.Kind {
+		case token.INT:
+			return strconv.Atoi(e.Value)
+		case token.FLOAT, token.IMAG:
+			return strconv.ParseFloat(e.Value, 64)
+		case token.CHAR:
+			return e.Value[1], nil
+		case token.STRING:
+			return e.Value[1 : len(e.Value)-1], nil
+		default:
+			return nil, errors.New(fmt.Sprintf("Unknown basic literal %d", e.Kind))
+		}
 	default:
 		return nil, errors.New(fmt.Sprintf("Unknown EXPR %T", e))
 	}

@@ -1,7 +1,6 @@
 package main
 
 import (
-	"flag"
 	"fmt"
 	"go/ast"
 	"go/parser"
@@ -15,10 +14,9 @@ import (
 var contexts []PryContext
 
 func main() {
-	filePath := flag.String("f", "", "The file to run.")
-	flag.Parse()
+	filePath := os.Args[len(os.Args)-1]
 
-	fmt.Println("Parsing:", *filePath)
+	fmt.Println("Prying into ", filePath)
 
 	contexts = make([]PryContext, 0)
 
@@ -26,7 +24,7 @@ func main() {
 
 	// Parse the file containing this very example
 	// but stop after processing the imports.
-	f, err := parser.ParseFile(fset, *filePath, nil, 0)
+	f, err := parser.ParseFile(fset, filePath, nil, 0)
 	if err != nil {
 		fmt.Println(err)
 		return
@@ -50,9 +48,8 @@ func main() {
 		vars = append(vars, f.Name.Name)
 		ExtractVariables(vars, f.Body.List)
 	}
-	fmt.Println("FINAL VARS", vars, "FUNCS", funcs)
 
-	fileTextBytes, err := ioutil.ReadFile(*filePath)
+	fileTextBytes, err := ioutil.ReadFile(filePath)
 	if err != nil {
 		panic(err)
 	}
@@ -61,7 +58,6 @@ func main() {
 
 	offset := 0
 
-	fmt.Println("Applying PRY")
 	for _, context := range contexts {
 		vars := FilterVars(context.Vars)
 		obj := "map[string]interface{}{ "
@@ -74,9 +70,8 @@ func main() {
 		offset = len(text) - (context.End - context.Start)
 	}
 
-	tmpPath := *filePath + ".go"
+	tmpPath := filePath + ".go"
 	ioutil.WriteFile(tmpPath, ([]byte)(fileText), 0644)
-	fmt.Println("DONE!")
 
 	binary, lookErr := exec.LookPath("go")
 	if lookErr != nil {
@@ -102,7 +97,6 @@ func FilterVars(vars []string) []string {
 }
 
 func ExtractVariables(vars []string, l []ast.Stmt) []string {
-	fmt.Println("VARS", vars)
 	for _, s := range l {
 		vars = HandleStatement(vars, s)
 	}
@@ -112,11 +106,9 @@ func ExtractVariables(vars []string, l []ast.Stmt) []string {
 func HandleStatement(vars []string, s ast.Stmt) []string {
 	switch stmt := s.(type) {
 	case *ast.ExprStmt:
-		fmt.Println("EXPR", stmt)
 		vars = HandleExpr(vars, stmt.X)
 	case *ast.AssignStmt:
 		lhsStatements := (*stmt).Lhs
-		fmt.Println("ASSIGN", lhsStatements)
 		for _, v := range lhsStatements {
 			vars = HandleExpr(vars, v)
 		}
@@ -124,7 +116,6 @@ func HandleStatement(vars []string, s ast.Stmt) []string {
 		HandleIfStmt(vars, stmt)
 	case *ast.DeclStmt:
 		decl := stmt.Decl.(*ast.GenDecl)
-		fmt.Println("DECL", decl)
 		if decl.Tok == token.VAR {
 			for _, spec := range decl.Specs {
 				valSpec := spec.(*ast.ValueSpec)
@@ -136,14 +127,12 @@ func HandleStatement(vars []string, s ast.Stmt) []string {
 	case *ast.RangeStmt:
 		HandleRangeStmt(vars, stmt)
 	default:
-		fmt.Printf("Unknown %T", stmt)
+		fmt.Printf("Unknown %T\n", stmt)
 	}
-	fmt.Println("VARS", vars)
 	return vars
 }
 
 func HandleIfStmt(vars []string, stmt *ast.IfStmt) []string {
-	fmt.Println("IF", stmt)
 	vars = HandleStatement(vars, stmt.Init)
 	vars = HandleStatement(vars, stmt.Body)
 	return vars
@@ -157,7 +146,6 @@ func HandleRangeStmt(vars []string, stmt *ast.RangeStmt) []string {
 }
 
 func HandleBlockStmt(vars []string, stmt *ast.BlockStmt) []string {
-	fmt.Println("BLOCK", stmt)
 	vars = ExtractVariables(vars, stmt.List)
 	return vars
 }
@@ -172,11 +160,9 @@ func HandleIdents(vars []string, idents []*ast.Ident) []string {
 func HandleExpr(vars []string, v ast.Expr) []string {
 	switch expr := v.(type) {
 	case *ast.Ident:
-		fmt.Println("IDENT", expr)
 		vars = append(vars, expr.Name)
 	case *ast.CallExpr:
 		funcName := expr.Fun.(*ast.SelectorExpr).Sel.Name
-		fmt.Println("CALL EXPR", funcName, expr.Pos(), expr.End())
 		if funcName == "Pry" {
 			contexts = append(contexts, PryContext{(int)(expr.Pos() - 1), (int)(expr.End() - 1), vars})
 		}
