@@ -8,11 +8,55 @@ import (
 	"go/token"
 	"reflect"
 	"strconv"
+	"strings"
 )
 
 type Scope map[string]interface{}
 
 func InterpretString(scope Scope, exprStr string) (interface{}, error) {
+
+	// TODO: Mild hack, should just parse string with wrapper
+	parts := strings.Split(exprStr, "=")
+	if len(parts) == 2 && len(parts[0]) > 0 && len(parts[1]) > 0 {
+		lhs := parts[0]
+		rhs := parts[1]
+
+		infer := lhs[len(lhs)-1:] == ":"
+		if infer {
+			lhs = lhs[:len(lhs)-1]
+		}
+		lhsExpr, err := parser.ParseExpr(lhs)
+
+		// Ignore this error and fall back to standard parser
+		if err == nil {
+			lhsIdent, isIdent := lhsExpr.(*ast.Ident)
+			if isIdent {
+				prevVal, exists := scope[lhsIdent.Name]
+				// Enforce := and =
+				if !exists && !infer {
+					return nil, errors.New(fmt.Sprintf("Variable %#v is not defined.", lhsIdent.Name))
+				} else if exists && infer {
+					return nil, errors.New(fmt.Sprintf("Variable %#v is already defined.", lhsIdent.Name))
+				}
+
+				rhsExpr, err := parser.ParseExpr(rhs)
+				if err != nil {
+					return nil, err
+				}
+				val, err := InterpretExpr(scope, rhsExpr)
+				if err != nil {
+					return nil, err
+				}
+
+				// Enforce types
+				if exists && reflect.TypeOf(prevVal) != reflect.TypeOf(val) {
+					return nil, errors.New(fmt.Sprintf("Error %#v is of type %T not %T.", lhsIdent.Name, prevVal, val))
+				}
+				scope[lhsIdent.Name] = val
+				return val, nil
+			}
+		}
+	}
 	expr, err := parser.ParseExpr(exprStr)
 	if err != nil {
 		return nil, err

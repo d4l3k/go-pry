@@ -15,7 +15,7 @@ import (
 func Pry(v ...interface{}) {
 }
 
-func Apply(v map[string]interface{}) {
+func Apply(v Scope) {
 	// disable input buffering
 	exec.Command("stty", "-F", "/dev/tty", "cbreak", "min", "1").Run()
 	// do not display entered characters on the screen
