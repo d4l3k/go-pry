@@ -1,10 +1,14 @@
 package pry
 
 import (
+	"github.com/mgutz/ansi"
+
 	"fmt"
+	"io/ioutil"
 	"os"
 	"os/exec"
 	"reflect"
+	"runtime"
 	"strings"
 )
 
@@ -20,11 +24,44 @@ func Apply(v map[string]interface{}) {
 	// restore the echoing state when exiting
 	defer exec.Command("stty", "-F", "/dev/tty", "echo").Run()
 
+	_, filePathRaw, lineNum, _ := runtime.Caller(1)
+	filePath := strings.TrimSuffix(filePathRaw, ".go")
+	fmt.Printf("From %s @ line %d :\n\n", filePath, lineNum)
+	file, err := ioutil.ReadFile(filePath)
+	if err != nil {
+		fmt.Println(err)
+	}
+	lines := strings.Split((string)(file), "\n")
+	lineNum -= 1
+	start := lineNum - 5
+	if start < 0 {
+		start = 0
+	}
+	end := lineNum + 5
+	if end > len(lines) {
+		end = len(lines)
+	}
+	maxLength := len(fmt.Sprint(end))
+	for i := start; i <= end; i++ {
+		caret := "  "
+		if i == lineNum {
+			caret = "=>"
+		}
+		numStr := fmt.Sprint(i)
+		if len(numStr) < maxLength {
+			numStr = " " + numStr
+		}
+		num := ansi.Color(numStr, "blue+b")
+		line := strings.Replace(lines[i], "\t", "  ", -1)
+		fmt.Printf(" %s %s: %s\n", caret, num, Highlight(line))
+	}
+	fmt.Println()
+
 	line := ""
 	count := 1
 	var b []byte = make([]byte, 1)
 	for {
-		fmt.Printf("\r[%d] go-pry> %s", count, line)
+		fmt.Printf("\r[%d] go-pry> %s \033[1D", count, line)
 		os.Stdin.Read(b)
 		switch b[0] {
 		default:
@@ -33,6 +70,12 @@ func Apply(v map[string]interface{}) {
 			if len(line) > 0 {
 				line = line[:len(line)-1]
 			}
+		case 27: // ? These two happen on key press
+		case 91: // ?
+		case 65: // Up
+		case 66: // Down
+		case 67: // Right
+		case 68: // Left
 		case 9: //TAB
 			if len(line) > 0 && line[len(line)-1] == '.' {
 				val, present := v[line[:len(line)-1]]

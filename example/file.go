@@ -28,6 +28,7 @@ func main() {
 		for i, j := range []int{1} {
 			k := 1
 			log.Println(i, j, k)
+			// Example comment
 			pry.Pry()
 		}
 	}

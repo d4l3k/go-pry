@@ -28,7 +28,8 @@ func main() {
 		for i, j := range []int{1} {
 			k := 1
 			log.Println(i, j, k)
-			pry.Apply(map[string]interface{}{ "X": X, "main": main, "a": a, "b": b, "m": m, "d": d, "i": i, "j": j, "k": k, })
+			// Example comment
+			pry.Apply(map[string]interface{}{ "main": main, "a": a, "b": b, "m": m, "d": d, "i": i, "j": j, "k": k, })
 
 		}
 	}
