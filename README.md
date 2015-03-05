@@ -1,6 +1,8 @@
 # go-pry
 
-go-pry is an interactive REPL for Go that allows you to drop into your code at any point.
+go-pry - an interactive REPL for Go that allows you to drop into your code at any point.
+
+![go-pry](https://i.imgur.com/1fdaLZF.png =400x)
 
 
 ## Usage
