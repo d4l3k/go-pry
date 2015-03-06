@@ -82,6 +82,7 @@ func Apply(v Scope) {
 					} else {
 						line = history[currentPos]
 					}
+					continue
 				case 65: // Up
 					currentPos -= 1
 					if currentPos < 0 {
@@ -90,10 +91,12 @@ func Apply(v Scope) {
 					if len(history) > 0 {
 						line = history[currentPos]
 					}
+					continue
 				case 67: // Right
+					continue
 				case 68: // Left
+					continue
 				}
-				continue
 			}
 			line += string(b)
 		case 127: // Backspace

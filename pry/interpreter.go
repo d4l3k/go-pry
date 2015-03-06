@@ -67,7 +67,6 @@ func InterpretString(scope Scope, exprStr string) (interface{}, error) {
 
 // Interprets an ast.Expr and returns the value.
 func InterpretExpr(scope Scope, expr ast.Expr) (interface{}, error) {
-	//fmt.Printf("EXPR %#v\n", expr)
 
 	switch e := expr.(type) {
 	case *ast.Ident:
@@ -88,6 +87,7 @@ func InterpretExpr(scope Scope, expr ast.Expr) (interface{}, error) {
 			}
 		}
 		return obj, nil
+
 	case *ast.SelectorExpr:
 		X, err := InterpretExpr(scope, e.X)
 		if err != nil {
@@ -109,6 +109,7 @@ func InterpretExpr(scope Scope, expr ast.Expr) (interface{}, error) {
 			return method.Interface(), nil
 		}
 		return nil, errors.New(fmt.Sprintf("Unknown field %#v", sel.Name))
+
 	case *ast.CallExpr:
 		fun, err := InterpretExpr(scope, e.Fun)
 		if err != nil {
@@ -120,6 +121,7 @@ func InterpretExpr(scope Scope, expr ast.Expr) (interface{}, error) {
 		// TODO CALL WITH ARGS
 		values := funVal.Call([]reflect.Value{})
 		return ValuesToInterfaces(values)[0], nil
+
 	case *ast.BasicLit:
 		switch e.Kind {
 		case token.INT:
@@ -133,11 +135,13 @@ func InterpretExpr(scope Scope, expr ast.Expr) (interface{}, error) {
 		default:
 			return nil, errors.New(fmt.Sprintf("Unknown basic literal %d", e.Kind))
 		}
+
 	case *ast.CompositeLit:
 		typ, err := InterpretExpr(scope, e.Type)
 		if err != nil {
 			return nil, err
 		}
+
 		switch t := e.Type.(type) {
 		case *ast.ArrayType:
 			l := len(e.Elts)
@@ -150,9 +154,32 @@ func InterpretExpr(scope Scope, expr ast.Expr) (interface{}, error) {
 				slice.Index(i).Set(reflect.ValueOf(elemValue))
 			}
 			return slice.Interface(), nil
+
+		case *ast.MapType:
+			nMap := reflect.MakeMap(typ.(reflect.Type))
+			for _, elem := range e.Elts {
+				switch eT := elem.(type) {
+				case *ast.KeyValueExpr:
+					key, err := InterpretExpr(scope, eT.Key)
+					if err != nil {
+						return nil, err
+					}
+					val, err := InterpretExpr(scope, eT.Value)
+					if err != nil {
+						return nil, err
+					}
+					nMap.SetMapIndex(reflect.ValueOf(key), reflect.ValueOf(val))
+
+				default:
+					return nil, errors.New(fmt.Sprintf("Invalid element type %#v to map. Expecting key value pair.", eT))
+				}
+			}
+			return nMap.Interface(), nil
+
 		default:
 			return nil, errors.New(fmt.Sprintf("Unknown composite literal %#v", t))
 		}
+
 	case *ast.BinaryExpr:
 		x, err := InterpretExpr(scope, e.X)
 		if err != nil {
@@ -162,14 +189,15 @@ func InterpretExpr(scope Scope, expr ast.Expr) (interface{}, error) {
 		if err != nil {
 			return nil, err
 		}
-
 		return ComputeBinaryOp(x, y, e.Op)
+
 	case *ast.UnaryExpr:
 		x, err := InterpretExpr(scope, e.X)
 		if err != nil {
 			return nil, err
 		}
 		return ComputeUnaryOp(x, e.Op)
+
 	case *ast.ArrayType:
 		typ, err := InterpretExpr(scope, e.Elt)
 		if err != nil {
@@ -177,6 +205,19 @@ func InterpretExpr(scope Scope, expr ast.Expr) (interface{}, error) {
 		}
 		arrType := reflect.SliceOf(typ.(reflect.Type))
 		return arrType, nil
+
+	case *ast.MapType:
+		keyType, err := InterpretExpr(scope, e.Key)
+		if err != nil {
+			return nil, err
+		}
+		valType, err := InterpretExpr(scope, e.Value)
+		if err != nil {
+			return nil, err
+		}
+		mapType := reflect.MapOf(keyType.(reflect.Type), valType.(reflect.Type))
+		return mapType, nil
+
 	case *ast.IndexExpr:
 		X, err := InterpretExpr(scope, e.X)
 		if err != nil {
@@ -195,8 +236,10 @@ func InterpretExpr(scope Scope, expr ast.Expr) (interface{}, error) {
 			return nil, errors.New("slice index out of range")
 		}
 		return xVal.Index(iVal).Interface(), nil
+
 	case *ast.ParenExpr:
 		return InterpretExpr(scope, e.X)
+
 	default:
 		return nil, errors.New(fmt.Sprintf("Unknown EXPR %T", e))
 	}
