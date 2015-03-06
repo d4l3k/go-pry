@@ -71,9 +71,10 @@ func InterpretExpr(scope Scope, expr ast.Expr) (interface{}, error) {
 	switch e := expr.(type) {
 	case *ast.Ident:
 		builtinScope := map[string]interface{}{
-			"nil":   nil,
-			"true":  true,
-			"false": false,
+			"nil":    nil,
+			"true":   true,
+			"false":  false,
+			"append": Append,
 		}
 		typ, err := StringToType(e.Name)
 		if err == nil {
@@ -115,11 +116,16 @@ func InterpretExpr(scope Scope, expr ast.Expr) (interface{}, error) {
 		if err != nil {
 			return nil, err
 		}
-		args := e.Args
-		_ = args
+		args := make([]reflect.Value, len(e.Args))
+		for i, arg := range e.Args {
+			interpretedArg, err := InterpretExpr(scope, arg)
+			if err != nil {
+				return nil, err
+			}
+			args[i] = reflect.ValueOf(interpretedArg)
+		}
 		funVal := reflect.ValueOf(fun)
-		// TODO CALL WITH ARGS
-		values := funVal.Call([]reflect.Value{})
+		values := funVal.Call(args)
 		return ValuesToInterfaces(values)[0], nil
 
 	case *ast.BasicLit:
