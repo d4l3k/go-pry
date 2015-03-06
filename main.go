@@ -3,11 +3,14 @@ package main
 import (
 	"fmt"
 	"go/ast"
+	"go/build"
 	"go/parser"
 	"go/token"
 	"io/ioutil"
 	"os"
 	"os/exec"
+	"path/filepath"
+	"strings"
 	"syscall"
 )
 
@@ -28,6 +31,30 @@ func main() {
 	if err != nil {
 		fmt.Println(err)
 		return
+	}
+
+	fmt.Println(f.Imports)
+
+	packagePairs := []string{}
+	for _, imp := range f.Imports {
+		importStr := imp.Path.Value[1 : len(imp.Path.Value)-1]
+		if importStr != "../pry" {
+			dir := filepath.Dir(filePath)
+			pkg, err := build.Import(importStr, dir, build.AllowBinary)
+			if err != nil {
+				panic(err)
+			}
+			pkgAst, err := parser.ParseDir(fset, pkg.Dir, nil, 0)
+			if err != nil {
+				panic(err)
+			}
+			pair := "\"" + pkg.Name + "\": pry.Package{Name: \"" + pkg.Name + "\", Functions: map[string]interface{}{"
+			for _, nPkg := range pkgAst {
+				pair += GetExports(nPkg)
+			}
+			pair += "}}, "
+			packagePairs = append(packagePairs, pair)
+		}
 	}
 
 	funcs := make([]*ast.FuncDecl, 0)
@@ -62,8 +89,9 @@ func main() {
 		vars := FilterVars(context.Vars)
 		obj := "map[string]interface{}{ "
 		for _, v := range vars {
-			obj = obj + "\"" + v + "\": " + v + ", "
+			obj += "\"" + v + "\": " + v + ", "
 		}
+		obj += strings.Join(packagePairs, "")
 		obj += "}"
 		text := "pry.Apply(" + obj + ")\n"
 		fileText = fileText[0:context.Start+offset] + text + fileText[context.End+offset:]
@@ -84,6 +112,26 @@ func main() {
 		panic(execErr)
 	}
 
+}
+
+func GetExports(pkg *ast.Package) string {
+	vars := ""
+	for name, file := range pkg.Files {
+		if !strings.HasSuffix(name, "_test.go") {
+			// Print the imports from the file's AST.
+			for k, obj := range file.Scope.Objects {
+				firstLetter := k[0:1]
+				if firstLetter == strings.ToUpper(firstLetter) {
+					vars += "\"" + k + "\": " + pkg.Name + "." + k
+					if obj.Kind == ast.Typ {
+						vars += "{}"
+					}
+					vars += ", "
+				}
+			}
+		}
+	}
+	return vars
 }
 
 func FilterVars(vars []string) []string {

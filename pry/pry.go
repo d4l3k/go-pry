@@ -16,6 +16,12 @@ func Pry(v ...interface{}) {
 }
 
 func Apply(v Scope) {
+	for _, v := range v {
+		p, isPackage := v.(Package)
+		if isPackage {
+			p.Process()
+		}
+	}
 	// disable input buffering
 	exec.Command("stty", "-F", "/dev/tty", "cbreak", "min", "1").Run()
 	// do not display entered characters on the screen

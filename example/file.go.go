@@ -29,7 +29,7 @@ func main() {
 			k := 1
 			log.Println(i, j, k)
 			// Example comment
-			pry.Apply(map[string]interface{}{ "X": X, "main": main, "a": a, "b": b, "m": m, "d": d, "i": i, "j": j, "k": k, })
+			pry.Apply(map[string]interface{}{ "X": X, "main": main, "a": a, "b": b, "m": m, "d": d, "i": i, "j": j, "k": k, "log": pry.Package{Name: "log", Functions: map[string]interface{}{"Ltime": log.Ltime, "LstdFlags": log.LstdFlags, "Prefix": log.Prefix, "Fatalf": log.Fatalf, "Fatalln": log.Fatalln, "Panicf": log.Panicf, "Llongfile": log.Llongfile, "Lshortfile": log.Lshortfile, "SetPrefix": log.SetPrefix, "Print": log.Print, "Fatal": log.Fatal, "Panic": log.Panic, "Panicln": log.Panicln, "Ldate": log.Ldate, "New": log.New, "Flags": log.Flags, "SetFlags": log.SetFlags, "Println": log.Println, "Printf": log.Printf, "Lmicroseconds": log.Lmicroseconds, "Logger": log.Logger{}, "SetOutput": log.SetOutput, }}, })
 
 		}
 	}

@@ -67,19 +67,22 @@ func InterpretString(scope Scope, exprStr string) (interface{}, error) {
 
 // Interprets an ast.Expr and returns the value.
 func InterpretExpr(scope Scope, expr ast.Expr) (interface{}, error) {
+	builtinScope := map[string]interface{}{
+		"nil":    nil,
+		"true":   true,
+		"false":  false,
+		"append": Append,
+		"make":   Make,
+	}
 
 	switch e := expr.(type) {
 	case *ast.Ident:
-		builtinScope := map[string]interface{}{
-			"nil":    nil,
-			"true":   true,
-			"false":  false,
-			"append": Append,
-		}
+
 		typ, err := StringToType(e.Name)
 		if err == nil {
 			return typ, err
 		}
+
 		obj, exists := scope[e.Name]
 		if !exists {
 			obj, exists = builtinScope[e.Name]
@@ -100,6 +103,16 @@ func InterpretExpr(scope Scope, expr ast.Expr) (interface{}, error) {
 		if rVal.Kind() != reflect.Struct {
 			return nil, errors.New(fmt.Sprintf("%#v is not a struct and thus has no field %#v", X, sel.Name))
 		}
+
+		pkg, isPackage := X.(Package)
+		if isPackage {
+			obj, isPresent := pkg.Functions[sel.Name]
+			if isPresent {
+				return obj, nil
+			}
+			return nil, errors.New(fmt.Sprintf("Unknown field %#v", sel.Name))
+		}
+
 		zero := reflect.ValueOf(nil)
 		field := rVal.FieldByName(sel.Name)
 		if field != zero {
@@ -125,8 +138,14 @@ func InterpretExpr(scope Scope, expr ast.Expr) (interface{}, error) {
 			args[i] = reflect.ValueOf(interpretedArg)
 		}
 		funVal := reflect.ValueOf(fun)
-		values := funVal.Call(args)
-		return ValuesToInterfaces(values)[0], nil
+		values := ValuesToInterfaces(funVal.Call(args))
+		if len(values) == 0 {
+			return nil, nil
+		} else if len(values) == 1 {
+			return values[0], nil
+		}
+		err, _ = values[1].(error)
+		return values[0], err
 
 	case *ast.BasicLit:
 		switch e.Kind {
@@ -224,6 +243,17 @@ func InterpretExpr(scope Scope, expr ast.Expr) (interface{}, error) {
 		mapType := reflect.MapOf(keyType.(reflect.Type), valType.(reflect.Type))
 		return mapType, nil
 
+	case *ast.ChanType:
+		typeI, err := InterpretExpr(scope, e.Value)
+		if err != nil {
+			return nil, err
+		}
+		typ, isType := typeI.(reflect.Type)
+		if !isType {
+			return nil, errors.New(fmt.Sprintf("chan needs to be passed a type not %T", typ))
+		}
+		return reflect.ChanOf(reflect.BothDir, typ), nil
+
 	case *ast.IndexExpr:
 		X, err := InterpretExpr(scope, e.X)
 		if err != nil {
@@ -233,15 +263,48 @@ func InterpretExpr(scope Scope, expr ast.Expr) (interface{}, error) {
 		if err != nil {
 			return nil, err
 		}
-		iVal, isInt := i.(int)
-		if !isInt {
-			return nil, errors.New(fmt.Sprintf("Index has to be an int not %T", i))
+		xVal := reflect.ValueOf(X)
+		if reflect.TypeOf(X).Kind() == reflect.Map {
+			return xVal.MapIndex(reflect.ValueOf(i)).Interface(), nil
+		} else {
+			iVal, isInt := i.(int)
+			if !isInt {
+				return nil, errors.New(fmt.Sprintf("Index has to be an int not %T", i))
+			}
+			if iVal >= xVal.Len() || iVal < 0 {
+				return nil, errors.New("slice index out of range")
+			}
+			return xVal.Index(iVal).Interface(), nil
+		}
+	case *ast.SliceExpr:
+		low, err := InterpretExpr(scope, e.Low)
+		if err != nil {
+			return nil, err
+		}
+		high, err := InterpretExpr(scope, e.High)
+		if err != nil {
+			return nil, err
+		}
+		X, err := InterpretExpr(scope, e.X)
+		if err != nil {
+			return nil, err
 		}
 		xVal := reflect.ValueOf(X)
-		if iVal >= xVal.Len() || iVal < 0 {
-			return nil, errors.New("slice index out of range")
+		if low == nil {
+			low = 0
 		}
-		return xVal.Index(iVal).Interface(), nil
+		if high == nil {
+			high = xVal.Len()
+		}
+		lowVal, isLowInt := low.(int)
+		highVal, isHighInt := high.(int)
+		if !isLowInt || !isHighInt {
+			return nil, errors.New(fmt.Sprintf("slice: indexes have to be an ints not %T and %T", low, high))
+		}
+		if lowVal < 0 || highVal >= xVal.Len() {
+			return nil, errors.New("slice: index out of bounds")
+		}
+		return xVal.Slice(lowVal, highVal).Interface(), nil
 
 	case *ast.ParenExpr:
 		return InterpretExpr(scope, e.X)
