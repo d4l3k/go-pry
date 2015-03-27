@@ -35,7 +35,7 @@ go-pry <go file>
 
 ## Inspiration
 
-go-pry is greatly inspired by [Pry REPL](pryrepl.org) for Ruby.
+go-pry is greatly inspired by [Pry REPL](http://pryrepl.org) for Ruby.
 
 ## License
 
