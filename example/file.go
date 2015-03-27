@@ -6,6 +6,12 @@ import (
 	"log"
 )
 
+// Note: This file has some gibberish to test for highlighting and other edge cases.
+
+/*
+	Block Quote
+*/
+
 func X() bool {
 	return true
 }
@@ -23,6 +29,19 @@ func main() {
 	a := 1
 	b := Banana{"Jeoffry", []int{1, 2, 3}}
 	m := []int{1234}
+
+	testMake := make(chan int, 1)
+	testMap := map[int]interface{}{
+		1: 2,
+		3: "asdf",
+		5: []interface{}{
+			1, "asdf",
+		},
+	}
+	go func() {
+		_ = 1 + 1*1/1%1
+	}()
+
 	if d := X(); d {
 		log.Println(d)
 		for i, j := range []int{1} {
@@ -32,5 +51,5 @@ func main() {
 			pry.Pry()
 		}
 	}
-	log.Println("Test", a, b, main)
+	log.Println("Test", a, b, main, testMake)
 }

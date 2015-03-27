@@ -17,7 +17,7 @@ func Highlight(s string) string {
 	highlightSymbols := []string{"==", "!=", ":=", "="}
 	highlightKeywords := []string{
 		"for", "defer", "go", "func", "struct", "switch", "case",
-		"interface", "if", "range", "bool",
+		"interface", "if", "range", "bool", "type", "package", "import",
 	}
 	highlightTypes := []string{
 		"byte",
