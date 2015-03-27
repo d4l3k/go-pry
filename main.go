@@ -174,6 +174,8 @@ func HandleStatement(vars []string, s ast.Stmt) []string {
 		vars = HandleBlockStmt(vars, stmt)
 	case *ast.RangeStmt:
 		HandleRangeStmt(vars, stmt)
+	case *ast.ForStmt:
+		vars = HandleForStmt(vars, stmt)
 	default:
 		fmt.Printf("Unknown %T\n", stmt)
 	}
@@ -189,6 +191,13 @@ func HandleIfStmt(vars []string, stmt *ast.IfStmt) []string {
 func HandleRangeStmt(vars []string, stmt *ast.RangeStmt) []string {
 	vars = HandleExpr(vars, stmt.Key)
 	vars = HandleExpr(vars, stmt.Value)
+	vars = HandleStatement(vars, stmt.Body)
+	return vars
+}
+
+func HandleForStmt(vars []string, stmt *ast.ForStmt) []string {
+	fmt.Printf("FOR %#v\n", stmt)
+	vars = HandleStatement(vars, stmt.Init)
 	vars = HandleStatement(vars, stmt.Body)
 	return vars
 }
