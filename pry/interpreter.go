@@ -265,7 +265,12 @@ func InterpretExpr(scope Scope, expr ast.Expr) (interface{}, error) {
 		}
 		xVal := reflect.ValueOf(X)
 		if reflect.TypeOf(X).Kind() == reflect.Map {
-			return xVal.MapIndex(reflect.ValueOf(i)).Interface(), nil
+			val := xVal.MapIndex(reflect.ValueOf(i))
+			if !val.IsValid() {
+				// If not valid key, return the "zero" type. Eg for int 0, string ""
+				return reflect.Zero(xVal.Type().Elem()).Interface(), nil
+			}
+			return val.Interface(), nil
 		} else {
 			iVal, isInt := i.(int)
 			if !isInt {

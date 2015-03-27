@@ -43,6 +43,7 @@ func Make(t interface{}, args ...interface{}) (interface{}, error) {
 
 	case reflect.Chan:
 		if len(args) > 1 {
+			fmt.Printf("CHAN ARGS %#v", args)
 			return nil, errors.New("Invalid number of arguments. Too many.")
 		}
 		size := 0
