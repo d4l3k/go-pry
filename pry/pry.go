@@ -42,12 +42,12 @@ func Apply(v Scope) {
 	if start < 0 {
 		start = 0
 	}
-	end := lineNum + 5
+	end := lineNum + 6
 	if end > len(lines) {
 		end = len(lines)
 	}
 	maxLength := len(fmt.Sprint(end))
-	for i := start; i <= end; i++ {
+	for i := start; i < end; i++ {
 		caret := "  "
 		if i == lineNum {
 			caret = "=>"
