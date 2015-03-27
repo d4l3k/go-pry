@@ -154,7 +154,7 @@ func InterpretExpr(scope Scope, expr ast.Expr) (interface{}, error) {
 		case token.FLOAT, token.IMAG:
 			return strconv.ParseFloat(e.Value, 64)
 		case token.CHAR:
-			return e.Value[1], nil
+			return (rune)(e.Value[1]), nil
 		case token.STRING:
 			return e.Value[1 : len(e.Value)-1], nil
 		default:
