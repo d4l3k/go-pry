@@ -118,7 +118,7 @@ func InjectPry(filePath string) (string, error) {
 
 	newPath := filepath.Dir(filePath) + "/." + filepath.Base(filePath) + "pry"
 
-	err = pry.CopyFile(filePath, newPath)
+	err = os.Rename(filePath, newPath)
 	if err != nil {
 		return "", err
 	}
@@ -205,7 +205,6 @@ func main() {
 	signal.Notify(c, os.Interrupt)
 	go func() {
 		for range c {
-			RevertPry(modifiedFiles)
 		}
 	}()
 
