@@ -433,7 +433,36 @@ func ComputeBinaryOp(xI, yI interface{}, op token.Token) (interface{}, error) {
 			}
 		}
 	}
-	yUint, isUint := yI.(uint)
+	yUint, isUint := yI.(uint64)
+	if !isUint {
+		isUint = true
+		switch yV := yI.(type) {
+		case int:
+			yUint = uint64(yV)
+		case int8:
+			yUint = uint64(yV)
+		case int16:
+			yUint = uint64(yV)
+		case int32:
+			yUint = uint64(yV)
+		case int64:
+			yUint = uint64(yV)
+		case uint8:
+			yUint = uint64(yV)
+		case uint16:
+			yUint = uint64(yV)
+		case uint32:
+			yUint = uint64(yV)
+		case uint64:
+			yUint = uint64(yV)
+		case float32:
+			yUint = uint64(yV)
+		case float64:
+			yUint = uint64(yV)
+		default:
+			isUint = false
+		}
+	}
 	if isUint {
 		switch xI.(type) {
 		case int:

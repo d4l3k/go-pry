@@ -9,16 +9,29 @@ import (
 	"io/ioutil"
 	"os"
 	"os/exec"
+	"os/signal"
 	"path/filepath"
 	"strings"
-	"syscall"
+
+	"github.com/d4l3k/go-pry/pry"
 )
 
 var contexts []PryContext
 
-func main() {
-	filePath := os.Args[len(os.Args)-1]
+func ExecuteGoCmd(args []string) {
+	binary, lookErr := exec.LookPath("go")
+	if lookErr != nil {
+		panic(lookErr)
+	}
 
+	cmd := exec.Command(binary, args...)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	cmd.Stdin = os.Stdin
+	cmd.Run()
+}
+
+func InjectPry(filePath string) (string, error) {
 	fmt.Println("Prying into ", filePath)
 
 	contexts = make([]PryContext, 0)
@@ -29,8 +42,7 @@ func main() {
 	// but stop after processing the imports.
 	f, err := parser.ParseFile(fset, filePath, nil, 0)
 	if err != nil {
-		fmt.Println(err)
-		return
+		return "", err
 	}
 
 	fmt.Println(f.Imports)
@@ -85,6 +97,12 @@ func main() {
 
 	offset := 0
 
+	if len(contexts) == 0 {
+		return "", nil
+	}
+
+	fmt.Println(" :: Found", len(contexts), "pry statements.")
+
 	for _, context := range contexts {
 		vars := FilterVars(context.Vars)
 		obj := "map[string]interface{}{ "
@@ -93,25 +111,127 @@ func main() {
 		}
 		obj += strings.Join(packagePairs, "")
 		obj += "}"
-		text := "pry.Apply(" + obj + ")\n"
+		text := "pry.Apply(" + obj + ")"
 		fileText = fileText[0:context.Start+offset] + text + fileText[context.End+offset:]
 		offset = len(text) - (context.End - context.Start)
 	}
 
-	tmpPath := filePath + ".go"
-	ioutil.WriteFile(tmpPath, ([]byte)(fileText), 0644)
+	newPath := filepath.Dir(filePath) + "/." + filepath.Base(filePath) + "pry"
 
-	binary, lookErr := exec.LookPath("go")
-	if lookErr != nil {
-		panic(lookErr)
+	err = pry.CopyFile(filePath, newPath)
+	if err != nil {
+		return "", err
 	}
-	args := []string{"go", "run", tmpPath}
-	env := os.Environ()
-	execErr := syscall.Exec(binary, args, env)
-	if execErr != nil {
-		panic(execErr)
+	ioutil.WriteFile(filePath, ([]byte)(fileText), 0644)
+	return filePath, nil
+}
+
+func main() {
+	cmdArgs := os.Args[1:]
+	if len(cmdArgs) == 0 {
+		ExecuteGoCmd([]string{})
+		fmt.Println("----")
+		fmt.Println("go-pry is a wrapper around the go command.")
+		fmt.Println("You can execute go commands as normal and go-pry will take care of generating the pry code.")
+		fmt.Println("You can also use 'go-pry revert' to cleanup go-pry generated files. They should automatically be removed.")
+		return
 	}
 
+	goDirs := []string{}
+	for _, arg := range cmdArgs {
+		if strings.HasSuffix(arg, ".go") {
+			goDirs = append(goDirs, filepath.Dir(arg))
+		}
+	}
+	if len(goDirs) == 0 {
+		dir, err := os.Getwd()
+		if err != nil {
+			panic(err)
+		}
+		goDirs = []string{dir}
+	}
+
+	processedFiles := []string{}
+	modifiedFiles := []string{}
+
+	if cmdArgs[0] == "revert" {
+		fmt.Println("REVERTING PRY")
+		for _, dir := range goDirs {
+			filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
+				if strings.HasSuffix(path, ".gopry") {
+					processed := false
+					for _, file := range processedFiles {
+						if file == path {
+							processed = true
+						}
+					}
+					if !processed {
+						base := filepath.Base(path)
+						newPath := filepath.Dir(path) + "/" + base[1:len(base)-3]
+						modifiedFiles = append(modifiedFiles, newPath)
+					}
+				}
+				return nil
+			})
+		}
+		RevertPry(modifiedFiles)
+		return
+	}
+
+	for _, dir := range goDirs {
+		filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
+			if strings.HasSuffix(path, ".go") {
+				processed := false
+				for _, file := range processedFiles {
+					if file == path {
+						processed = true
+					}
+				}
+				if !processed {
+					file, err := InjectPry(path)
+					if err != nil {
+						panic(err)
+					}
+					if file != "" {
+						modifiedFiles = append(modifiedFiles, path)
+					}
+				}
+			}
+			return nil
+		})
+	}
+
+	c := make(chan os.Signal, 1)
+	signal.Notify(c, os.Interrupt)
+	go func() {
+		for range c {
+			RevertPry(modifiedFiles)
+		}
+	}()
+
+	ExecuteGoCmd(cmdArgs)
+
+	RevertPry(modifiedFiles)
+}
+
+func RevertPry(modifiedFiles []string) {
+	fmt.Println("Reverting files")
+	for _, file := range modifiedFiles {
+		newPath := filepath.Dir(file) + "/." + filepath.Base(file) + "pry"
+		if _, err := os.Stat(newPath); os.IsNotExist(err) {
+			fmt.Println(" :: no such file or directory:", newPath)
+			continue
+		}
+
+		err := os.Remove(file)
+		if err != nil {
+			fmt.Println(err)
+		}
+		err = os.Rename(newPath, file)
+		if err != nil {
+			fmt.Println(err)
+		}
+	}
 }
 
 func GetExports(pkg *ast.Package) string {
@@ -121,12 +241,24 @@ func GetExports(pkg *ast.Package) string {
 			// Print the imports from the file's AST.
 			for k, obj := range file.Scope.Objects {
 				firstLetter := k[0:1]
-				if firstLetter == strings.ToUpper(firstLetter) {
+				if firstLetter == strings.ToUpper(firstLetter) && firstLetter != "_" {
 					vars += "\"" + k + "\": " + pkg.Name + "." + k
+					switch stmt := obj.Decl.(type) {
+					case *ast.ValueSpec:
+						fmt.Printf("FILE %#v %#v\n", obj.Name, stmt.Values)
+						if len(stmt.Values) > 0 {
+							out, err := pry.InterpretExpr(pry.Scope{}, stmt.Values[0])
+							if err != nil {
+								fmt.Println("ERR", err)
+								//continue
+							}
+							fmt.Println(out)
+						}
+					}
 					if obj.Kind == ast.Typ {
 						vars += "{}"
 					}
-					vars += ", "
+					vars += ","
 				}
 			}
 		}
@@ -196,7 +328,6 @@ func HandleRangeStmt(vars []string, stmt *ast.RangeStmt) []string {
 }
 
 func HandleForStmt(vars []string, stmt *ast.ForStmt) []string {
-	fmt.Printf("FOR %#v\n", stmt)
 	vars = HandleStatement(vars, stmt.Init)
 	vars = HandleStatement(vars, stmt.Body)
 	return vars
@@ -220,7 +351,7 @@ func HandleExpr(vars []string, v ast.Expr) []string {
 		vars = append(vars, expr.Name)
 	case *ast.CallExpr:
 		funcName := expr.Fun.(*ast.SelectorExpr).Sel.Name
-		if funcName == "Pry" {
+		if funcName == "Pry" || funcName == "Apply" {
 			contexts = append(contexts, PryContext{(int)(expr.Pos() - 1), (int)(expr.End() - 1), vars})
 		}
 	default:
