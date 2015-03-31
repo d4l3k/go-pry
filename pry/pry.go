@@ -1,15 +1,16 @@
 package pry
 
 import (
-	"github.com/mgutz/ansi"
-
 	"fmt"
 	"io/ioutil"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"reflect"
 	"runtime"
 	"strings"
+
+	"github.com/mgutz/ansi"
 )
 
 func Pry(v ...interface{}) {
@@ -30,7 +31,7 @@ func Apply(v Scope) {
 	defer exec.Command("stty", "-F", "/dev/tty", "echo").Run()
 
 	_, filePathRaw, lineNum, _ := runtime.Caller(1)
-	filePath := strings.TrimSuffix(filePathRaw, ".go")
+	filePath := filepath.Dir(filePathRaw) + "/." + filepath.Base(filePathRaw) + "pry"
 	fmt.Printf("\nFrom %s @ line %d :\n\n", filePath, lineNum)
 	file, err := ioutil.ReadFile(filePath)
 	if err != nil {
