@@ -16,10 +16,11 @@ const highlightColor5 = "red+b"
 func Highlight(s string) string {
 	highlightSymbols := []string{"==", "!=", ":=", "="}
 	highlightKeywords := []string{
-		"for", "defer", "go", "func", "struct", "switch", "case",
+		"for", "defer", "func", "struct", "switch", "case",
 		"interface", "if", "range", "bool", "type", "package", "import",
 		"make", "append",
 	}
+	highlightKeywordsSpaced := []string{"go"}
 	highlightTypes := []string{
 		"byte",
 		"complex129",
@@ -43,6 +44,7 @@ func Highlight(s string) string {
 	}
 	s = HighlightWords(s, []string{"\\d+(.\\d+)?", "nil", "true", "false"}, highlightColor4, "\\W")
 	s = HighlightWords(s, highlightKeywords, highlightColor1, "\\W")
+	s = HighlightWords(s, highlightKeywordsSpaced, highlightColor1, "\\s")
 	s = HighlightWords(s, highlightTypes, highlightColor2, "\\W")
 	s = HighlightWords(s, highlightSymbols, highlightColor1, "")
 	s = HighlightWords(s, []string{".+"}, highlightColor3, "\"")
