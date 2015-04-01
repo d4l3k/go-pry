@@ -4,6 +4,8 @@ go-pry - an interactive REPL for Go that allows you to drop into your code at an
 
 ![go-pry](https://i.imgur.com/yr1BEsK.png)
 
+Example
+
 ![go-pry Example](https://i.imgur.com/0rmwVY7.png)
 
 

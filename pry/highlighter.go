@@ -18,6 +18,7 @@ func Highlight(s string) string {
 	highlightKeywords := []string{
 		"for", "defer", "go", "func", "struct", "switch", "case",
 		"interface", "if", "range", "bool", "type", "package", "import",
+		"make", "append",
 	}
 	highlightTypes := []string{
 		"byte",
@@ -40,7 +41,7 @@ func Highlight(s string) string {
 		"uint9",
 		"uintptr",
 	}
-	s = HighlightWords(s, []string{"\\d+", "nil", "true", "false"}, highlightColor4, "\\W")
+	s = HighlightWords(s, []string{"\\d+(.\\d+)?", "nil", "true", "false"}, highlightColor4, "\\W")
 	s = HighlightWords(s, highlightKeywords, highlightColor1, "\\W")
 	s = HighlightWords(s, highlightTypes, highlightColor2, "\\W")
 	s = HighlightWords(s, highlightSymbols, highlightColor1, "")

@@ -32,7 +32,7 @@ func Apply(v Scope) {
 
 	_, filePathRaw, lineNum, _ := runtime.Caller(1)
 	filePath := filepath.Dir(filePathRaw) + "/." + filepath.Base(filePathRaw) + "pry"
-	fmt.Printf("\nFrom %s @ line %d :\n\n", filePath, lineNum)
+	fmt.Printf("\nFrom %s @ line %d :\n\n", filePathRaw, lineNum)
 	file, err := ioutil.ReadFile(filePath)
 	if err != nil {
 		fmt.Println(err)
@@ -53,7 +53,7 @@ func Apply(v Scope) {
 		if i == lineNum {
 			caret = "=>"
 		}
-		numStr := fmt.Sprint(i)
+		numStr := fmt.Sprint(i + 1)
 		if len(numStr) < maxLength {
 			numStr = " " + numStr
 		}
@@ -70,7 +70,7 @@ func Apply(v Scope) {
 	count := 0
 	var b []byte = make([]byte, 1)
 	for {
-		fmt.Printf("\r[%d] go-pry> %s \033[1D", currentPos, line)
+		fmt.Printf("\r\033[K[%d] go-pry> %s \033[1D", currentPos, Highlight(line))
 		bPrev := b[0]
 		os.Stdin.Read(b)
 		switch b[0] {
