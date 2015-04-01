@@ -256,11 +256,11 @@ func TestAppend(t *testing.T) {
 	emptyScope := Scope{
 		"a": []int{1},
 	}
-	out, err := InterpretString(emptyScope, "append(a, 2)")
+	out, err := InterpretString(emptyScope, "append(a, 2, 3)")
 	if err != nil {
 		t.Error(err)
 	}
-	expected := []int{1, 2}
+	expected := []int{1, 2, 3}
 	if !reflect.DeepEqual(expected, out) {
 		t.Error(fmt.Sprintf("Expected %#v got %#v.", expected, out))
 	}

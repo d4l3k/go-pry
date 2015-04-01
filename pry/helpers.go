@@ -7,13 +7,16 @@ import (
 )
 
 // A runtime replacement for the append function
-func Append(arr, elem interface{}) (interface{}, error) {
-	if reflect.TypeOf(arr) != reflect.SliceOf(reflect.TypeOf(elem)) {
-		return nil, errors.New(fmt.Sprintf("%T cannot append to %T.", elem, arr))
-	}
+func Append(arr interface{}, elems ...interface{}) (interface{}, error) {
 	arrVal := reflect.ValueOf(arr)
-	elemVal := reflect.ValueOf(elem)
-	return reflect.Append(arrVal, elemVal).Interface(), nil
+	valArr := make([]reflect.Value, len(elems))
+	for i, elem := range elems {
+		if reflect.TypeOf(arr) != reflect.SliceOf(reflect.TypeOf(elem)) {
+			return nil, errors.New(fmt.Sprintf("%T cannot append to %T.", elem, arr))
+		}
+		valArr[i] = reflect.ValueOf(elem)
+	}
+	return reflect.Append(arrVal, valArr...).Interface(), nil
 }
 
 // A runtime replacement for the make function
