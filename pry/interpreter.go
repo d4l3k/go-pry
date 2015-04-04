@@ -11,9 +11,10 @@ import (
 	"strings"
 )
 
+// Scope is a string-interface key-value pair that represents variables/functions in scope.
 type Scope map[string]interface{}
 
-// Interprets a string of go code and returns the result.
+// InterpretString interprets a string of go code and returns the result.
 func InterpretString(scope Scope, exprStr string) (interface{}, error) {
 
 	// TODO: Mild hack, should just parse string with wrapper
@@ -35,9 +36,9 @@ func InterpretString(scope Scope, exprStr string) (interface{}, error) {
 				prevVal, exists := scope[lhsIdent.Name]
 				// Enforce := and =
 				if !exists && !infer {
-					return nil, errors.New(fmt.Sprintf("Variable %#v is not defined.", lhsIdent.Name))
+					return nil, fmt.Errorf("Variable %#v is not defined.", lhsIdent.Name)
 				} else if exists && infer {
-					return nil, errors.New(fmt.Sprintf("Variable %#v is already defined.", lhsIdent.Name))
+					return nil, fmt.Errorf("Variable %#v is already defined.", lhsIdent.Name)
 				}
 
 				rhsExpr, err := parser.ParseExpr(rhs)
@@ -51,7 +52,7 @@ func InterpretString(scope Scope, exprStr string) (interface{}, error) {
 
 				// Enforce types
 				if exists && reflect.TypeOf(prevVal) != reflect.TypeOf(val) {
-					return nil, errors.New(fmt.Sprintf("Error %#v is of type %T not %T.", lhsIdent.Name, prevVal, val))
+					return nil, fmt.Errorf("Error %#v is of type %T not %T.", lhsIdent.Name, prevVal, val)
 				}
 				scope[lhsIdent.Name] = val
 				return val, nil
@@ -65,7 +66,7 @@ func InterpretString(scope Scope, exprStr string) (interface{}, error) {
 	return InterpretExpr(scope, expr)
 }
 
-// Interprets an ast.Expr and returns the value.
+// InterpretExpr interprets an ast.Expr and returns the value.
 func InterpretExpr(scope Scope, expr ast.Expr) (interface{}, error) {
 	builtinScope := map[string]interface{}{
 		"nil":    nil,
@@ -101,7 +102,7 @@ func InterpretExpr(scope Scope, expr ast.Expr) (interface{}, error) {
 
 		rVal := reflect.ValueOf(X)
 		if rVal.Kind() != reflect.Struct {
-			return nil, errors.New(fmt.Sprintf("%#v is not a struct and thus has no field %#v", X, sel.Name))
+			return nil, fmt.Errorf("%#v is not a struct and thus has no field %#v", X, sel.Name)
 		}
 
 		pkg, isPackage := X.(Package)
@@ -110,7 +111,7 @@ func InterpretExpr(scope Scope, expr ast.Expr) (interface{}, error) {
 			if isPresent {
 				return obj, nil
 			}
-			return nil, errors.New(fmt.Sprintf("Unknown field %#v", sel.Name))
+			return nil, fmt.Errorf("Unknown field %#v", sel.Name)
 		}
 
 		zero := reflect.ValueOf(nil)
@@ -122,7 +123,7 @@ func InterpretExpr(scope Scope, expr ast.Expr) (interface{}, error) {
 		if method != zero {
 			return method.Interface(), nil
 		}
-		return nil, errors.New(fmt.Sprintf("Unknown field %#v", sel.Name))
+		return nil, fmt.Errorf("Unknown field %#v", sel.Name)
 
 	case *ast.CallExpr:
 		fun, err := InterpretExpr(scope, e.Fun)
@@ -158,7 +159,7 @@ func InterpretExpr(scope Scope, expr ast.Expr) (interface{}, error) {
 		case token.STRING:
 			return e.Value[1 : len(e.Value)-1], nil
 		default:
-			return nil, errors.New(fmt.Sprintf("Unknown basic literal %d", e.Kind))
+			return nil, fmt.Errorf("Unknown basic literal %d", e.Kind)
 		}
 
 	case *ast.CompositeLit:
@@ -196,13 +197,13 @@ func InterpretExpr(scope Scope, expr ast.Expr) (interface{}, error) {
 					nMap.SetMapIndex(reflect.ValueOf(key), reflect.ValueOf(val))
 
 				default:
-					return nil, errors.New(fmt.Sprintf("Invalid element type %#v to map. Expecting key value pair.", eT))
+					return nil, fmt.Errorf("Invalid element type %#v to map. Expecting key value pair.", eT)
 				}
 			}
 			return nMap.Interface(), nil
 
 		default:
-			return nil, errors.New(fmt.Sprintf("Unknown composite literal %#v", t))
+			return nil, fmt.Errorf("Unknown composite literal %#v", t)
 		}
 
 	case *ast.BinaryExpr:
@@ -250,7 +251,7 @@ func InterpretExpr(scope Scope, expr ast.Expr) (interface{}, error) {
 		}
 		typ, isType := typeI.(reflect.Type)
 		if !isType {
-			return nil, errors.New(fmt.Sprintf("chan needs to be passed a type not %T", typ))
+			return nil, fmt.Errorf("chan needs to be passed a type not %T", typ)
 		}
 		return reflect.ChanOf(reflect.BothDir, typ), nil
 
@@ -271,16 +272,16 @@ func InterpretExpr(scope Scope, expr ast.Expr) (interface{}, error) {
 				return reflect.Zero(xVal.Type().Elem()).Interface(), nil
 			}
 			return val.Interface(), nil
-		} else {
-			iVal, isInt := i.(int)
-			if !isInt {
-				return nil, errors.New(fmt.Sprintf("Index has to be an int not %T", i))
-			}
-			if iVal >= xVal.Len() || iVal < 0 {
-				return nil, errors.New("slice index out of range")
-			}
-			return xVal.Index(iVal).Interface(), nil
 		}
+
+		iVal, isInt := i.(int)
+		if !isInt {
+			return nil, fmt.Errorf("Index has to be an int not %T", i)
+		}
+		if iVal >= xVal.Len() || iVal < 0 {
+			return nil, errors.New("slice index out of range")
+		}
+		return xVal.Index(iVal).Interface(), nil
 	case *ast.SliceExpr:
 		low, err := InterpretExpr(scope, e.Low)
 		if err != nil {
@@ -304,7 +305,7 @@ func InterpretExpr(scope Scope, expr ast.Expr) (interface{}, error) {
 		lowVal, isLowInt := low.(int)
 		highVal, isHighInt := high.(int)
 		if !isLowInt || !isHighInt {
-			return nil, errors.New(fmt.Sprintf("slice: indexes have to be an ints not %T and %T", low, high))
+			return nil, fmt.Errorf("slice: indexes have to be an ints not %T and %T", low, high)
 		}
 		if lowVal < 0 || highVal >= xVal.Len() {
 			return nil, errors.New("slice: index out of bounds")
@@ -315,11 +316,11 @@ func InterpretExpr(scope Scope, expr ast.Expr) (interface{}, error) {
 		return InterpretExpr(scope, e.X)
 
 	default:
-		return nil, errors.New(fmt.Sprintf("Unknown EXPR %T", e))
+		return nil, fmt.Errorf("Unknown EXPR %T", e)
 	}
 }
 
-// Returns the reflect.Type corresponding to the type string provided. Ex: StringToType("int")
+// StringToType returns the reflect.Type corresponding to the type string provided. Ex: StringToType("int")
 func StringToType(str string) (reflect.Type, error) {
 	types := map[string]reflect.Type{
 		"bool":       reflect.TypeOf(true),
@@ -345,12 +346,12 @@ func StringToType(str string) (reflect.Type, error) {
 	}
 	val, present := types[str]
 	if !present {
-		return nil, errors.New(fmt.Sprintf("Error type %#v is not in table.", str))
+		return nil, fmt.Errorf("Error type %#v is not in table.", str)
 	}
 	return val, nil
 }
 
-// Converts a slice of []reflect.Value to []interface{}
+// ValuesToInterfaces converts a slice of []reflect.Value to []interface{}
 func ValuesToInterfaces(vals []reflect.Value) []interface{} {
 	inters := make([]interface{}, len(vals))
 	for i, val := range vals {

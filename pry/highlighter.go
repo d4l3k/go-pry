@@ -13,6 +13,7 @@ const highlightColor3 = "red"
 const highlightColor4 = "blue+b"
 const highlightColor5 = "red+b"
 
+// Highlight highlights a string of go code for outputting to bash.
 func Highlight(s string) string {
 	highlightSymbols := []string{"==", "!=", ":=", "="}
 	highlightKeywords := []string{
@@ -42,18 +43,18 @@ func Highlight(s string) string {
 		"uint9",
 		"uintptr",
 	}
-	s = HighlightWords(s, []string{"\\d+(.\\d+)?", "nil", "true", "false"}, highlightColor4, "\\W")
-	s = HighlightWords(s, highlightKeywords, highlightColor1, "\\W")
-	s = HighlightWords(s, highlightKeywordsSpaced, highlightColor1, "\\s")
-	s = HighlightWords(s, highlightTypes, highlightColor2, "\\W")
-	s = HighlightWords(s, highlightSymbols, highlightColor1, "")
-	s = HighlightWords(s, []string{".+"}, highlightColor3, "\"")
-	s = HighlightWords(s, []string{"\""}, highlightColor5, "")
-	s = HighlightWords(s, []string{"//.+"}, highlightColor4, "")
+	s = highlightWords(s, []string{"\\d+(.\\d+)?", "nil", "true", "false"}, highlightColor4, "\\W")
+	s = highlightWords(s, highlightKeywords, highlightColor1, "\\W")
+	s = highlightWords(s, highlightKeywordsSpaced, highlightColor1, "\\s")
+	s = highlightWords(s, highlightTypes, highlightColor2, "\\W")
+	s = highlightWords(s, highlightSymbols, highlightColor1, "")
+	s = highlightWords(s, []string{".+"}, highlightColor3, "\"")
+	s = highlightWords(s, []string{"\""}, highlightColor5, "")
+	s = highlightWords(s, []string{"//.+"}, highlightColor4, "")
 	return s
 }
 
-func HighlightWords(s string, words []string, color, edges string) string {
+func highlightWords(s string, words []string, color, edges string) string {
 	lE := len(edges) - strings.Count(edges, "\\")
 	s = " " + s + " "
 	for _, word := range words {

@@ -6,24 +6,24 @@ import (
 	"reflect"
 )
 
-// A runtime replacement for the append function
+// Append is a runtime replacement for the append function
 func Append(arr interface{}, elems ...interface{}) (interface{}, error) {
 	arrVal := reflect.ValueOf(arr)
 	valArr := make([]reflect.Value, len(elems))
 	for i, elem := range elems {
 		if reflect.TypeOf(arr) != reflect.SliceOf(reflect.TypeOf(elem)) {
-			return nil, errors.New(fmt.Sprintf("%T cannot append to %T.", elem, arr))
+			return nil, fmt.Errorf("%T cannot append to %T", elem, arr)
 		}
 		valArr[i] = reflect.ValueOf(elem)
 	}
 	return reflect.Append(arrVal, valArr...).Interface(), nil
 }
 
-// A runtime replacement for the make function
+// Make is a runtime replacement for the make function
 func Make(t interface{}, args ...interface{}) (interface{}, error) {
 	typ, isType := t.(reflect.Type)
 	if !isType {
-		return nil, errors.New(fmt.Sprintf("Invalid type %#v", t))
+		return nil, fmt.Errorf("Invalid type %#v", t)
 	}
 	switch typ.Kind() {
 	case reflect.Slice:
@@ -61,6 +61,6 @@ func Make(t interface{}, args ...interface{}) (interface{}, error) {
 		return buffer.Interface(), nil
 
 	default:
-		return nil, errors.New(fmt.Sprintf("Unknown kind type %T", t))
+		return nil, fmt.Errorf("Unknown kind type %T", t)
 	}
 }

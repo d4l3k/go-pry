@@ -13,9 +13,11 @@ import (
 	"github.com/mgutz/ansi"
 )
 
+// Pry does nothing. It only exists so running code without go-pry doesn't throw an error.
 func Pry(v ...interface{}) {
 }
 
+// Apply drops into a pry shell in the location required.
 func Apply(v Scope) {
 	for _, v := range v {
 		p, isPackage := v.(Package)
@@ -38,7 +40,7 @@ func Apply(v Scope) {
 		fmt.Println(err)
 	}
 	lines := strings.Split((string)(file), "\n")
-	lineNum -= 1
+	lineNum--
 	start := lineNum - 5
 	if start < 0 {
 		start = 0
@@ -68,7 +70,7 @@ func Apply(v Scope) {
 
 	line := ""
 	count := 0
-	var b []byte = make([]byte, 1)
+	b := make([]byte, 1)
 	for {
 		fmt.Printf("\r\033[K[%d] go-pry> %s \033[1D", currentPos, Highlight(line))
 		bPrev := b[0]
@@ -80,7 +82,7 @@ func Apply(v Scope) {
 			} else if bPrev == 91 {
 				switch b[0] {
 				case 66: // Down
-					currentPos += 1
+					currentPos++
 					if len(history) < currentPos {
 						currentPos = len(history)
 					}
@@ -91,7 +93,7 @@ func Apply(v Scope) {
 					}
 					continue
 				case 65: // Up
-					currentPos -= 1
+					currentPos--
 					if currentPos < 0 {
 						currentPos = 0
 					}
@@ -114,7 +116,7 @@ func Apply(v Scope) {
 		case 9: //TAB
 			if len(line) == 0 {
 				fmt.Println()
-				for k, _ := range v {
+				for k := range v {
 					fmt.Print(k + " ")
 				}
 				fmt.Println()
@@ -124,11 +126,11 @@ func Apply(v Scope) {
 					typeOf := reflect.TypeOf(val)
 					fmt.Println()
 					methods := make([]string, typeOf.NumMethod())
-					for i, _ := range methods {
+					for i := range methods {
 						methods[i] = typeOf.Method(i).Name + "("
 					}
 					fields := make([]string, typeOf.NumField())
-					for i, _ := range fields {
+					for i := range fields {
 						fields[i] = typeOf.Field(i).Name
 					}
 					fmt.Println(typeOf.Name() + ": " + strings.Join(fields, " ") + " " + strings.Join(methods, " "))
@@ -150,7 +152,7 @@ func Apply(v Scope) {
 				fmt.Printf("=> %s\n", respStr)
 			}
 			history = append(history, line)
-			count += 1
+			count++
 			currentPos = count
 			line = ""
 		}

@@ -16,8 +16,9 @@ import (
 	"github.com/d4l3k/go-pry/pry"
 )
 
-var contexts []PryContext
+var contexts []pryContext
 
+// ExecuteGoCmd runs the 'go' command with certain parameters.
 func ExecuteGoCmd(args []string) {
 	binary, lookErr := exec.LookPath("go")
 	if lookErr != nil {
@@ -31,10 +32,11 @@ func ExecuteGoCmd(args []string) {
 	cmd.Run()
 }
 
+// InjectPry walks the scope and replaces pry.Pry with pry.Apply(pry.Scope{...}).
 func InjectPry(filePath string) (string, error) {
 	fmt.Println("Prying into ", filePath)
 
-	contexts = make([]PryContext, 0)
+	contexts = make([]pryContext, 0)
 
 	fset := token.NewFileSet() // positions are relative to fset
 
@@ -69,8 +71,8 @@ func InjectPry(filePath string) (string, error) {
 		}
 	}
 
-	funcs := make([]*ast.FuncDecl, 0)
-	vars := make([]string, 0)
+	var funcs []*ast.FuncDecl
+	var vars []string
 
 	// Print the imports from the file's AST.
 	for k, v := range f.Scope.Objects {
@@ -85,7 +87,7 @@ func InjectPry(filePath string) (string, error) {
 
 	for _, f := range funcs {
 		vars = append(vars, f.Name.Name)
-		ExtractVariables(vars, f.Body.List)
+		extractVariables(vars, f.Body.List)
 	}
 
 	fileTextBytes, err := ioutil.ReadFile(filePath)
@@ -104,7 +106,7 @@ func InjectPry(filePath string) (string, error) {
 	fmt.Println(" :: Found", len(contexts), "pry statements.")
 
 	for _, context := range contexts {
-		vars := FilterVars(context.Vars)
+		vars := filterVars(context.Vars)
 		obj := "map[string]interface{}{ "
 		for _, v := range vars {
 			obj += "\"" + v + "\": " + v + ", "
@@ -213,6 +215,7 @@ func main() {
 	RevertPry(modifiedFiles)
 }
 
+// RevertPry reverts the changes made by InjectPry.
 func RevertPry(modifiedFiles []string) {
 	fmt.Println("Reverting files")
 	for _, file := range modifiedFiles {
@@ -233,6 +236,7 @@ func RevertPry(modifiedFiles []string) {
 	}
 }
 
+// GetExports returns a string of gocode that represents the exports (constants/functions) of an ast.Package.
 func GetExports(pkg *ast.Package) string {
 	vars := ""
 	for name, file := range pkg.Files {
@@ -265,93 +269,92 @@ func GetExports(pkg *ast.Package) string {
 	return vars
 }
 
-func FilterVars(vars []string) []string {
-	fVars := make([]string, 0)
+func filterVars(vars []string) (fVars []string) {
 	for _, v := range vars {
 		if v != "_" {
 			fVars = append(fVars, v)
 		}
 	}
-	return fVars
+	return
 }
 
-func ExtractVariables(vars []string, l []ast.Stmt) []string {
+func extractVariables(vars []string, l []ast.Stmt) []string {
 	for _, s := range l {
-		vars = HandleStatement(vars, s)
+		vars = handleStatement(vars, s)
 	}
 	return vars
 }
 
-func HandleStatement(vars []string, s ast.Stmt) []string {
+func handleStatement(vars []string, s ast.Stmt) []string {
 	switch stmt := s.(type) {
 	case *ast.ExprStmt:
-		vars = HandleExpr(vars, stmt.X)
+		vars = handleExpr(vars, stmt.X)
 	case *ast.AssignStmt:
 		lhsStatements := (*stmt).Lhs
 		for _, v := range lhsStatements {
-			vars = HandleExpr(vars, v)
+			vars = handleExpr(vars, v)
 		}
 	case *ast.IfStmt:
-		HandleIfStmt(vars, stmt)
+		handleIfStmt(vars, stmt)
 	case *ast.DeclStmt:
 		decl := stmt.Decl.(*ast.GenDecl)
 		if decl.Tok == token.VAR {
 			for _, spec := range decl.Specs {
 				valSpec := spec.(*ast.ValueSpec)
-				vars = HandleIdents(vars, valSpec.Names)
+				vars = handleIdents(vars, valSpec.Names)
 			}
 		}
 	case *ast.BlockStmt:
-		vars = HandleBlockStmt(vars, stmt)
+		vars = handleBlockStmt(vars, stmt)
 	case *ast.RangeStmt:
-		HandleRangeStmt(vars, stmt)
+		handleRangeStmt(vars, stmt)
 	case *ast.ForStmt:
-		vars = HandleForStmt(vars, stmt)
+		vars = handleForStmt(vars, stmt)
 	default:
 		fmt.Printf("Unknown %T\n", stmt)
 	}
 	return vars
 }
 
-func HandleIfStmt(vars []string, stmt *ast.IfStmt) []string {
-	vars = HandleStatement(vars, stmt.Init)
-	vars = HandleStatement(vars, stmt.Body)
+func handleIfStmt(vars []string, stmt *ast.IfStmt) []string {
+	vars = handleStatement(vars, stmt.Init)
+	vars = handleStatement(vars, stmt.Body)
 	return vars
 }
 
-func HandleRangeStmt(vars []string, stmt *ast.RangeStmt) []string {
-	vars = HandleExpr(vars, stmt.Key)
-	vars = HandleExpr(vars, stmt.Value)
-	vars = HandleStatement(vars, stmt.Body)
+func handleRangeStmt(vars []string, stmt *ast.RangeStmt) []string {
+	vars = handleExpr(vars, stmt.Key)
+	vars = handleExpr(vars, stmt.Value)
+	vars = handleStatement(vars, stmt.Body)
 	return vars
 }
 
-func HandleForStmt(vars []string, stmt *ast.ForStmt) []string {
-	vars = HandleStatement(vars, stmt.Init)
-	vars = HandleStatement(vars, stmt.Body)
+func handleForStmt(vars []string, stmt *ast.ForStmt) []string {
+	vars = handleStatement(vars, stmt.Init)
+	vars = handleStatement(vars, stmt.Body)
 	return vars
 }
 
-func HandleBlockStmt(vars []string, stmt *ast.BlockStmt) []string {
-	vars = ExtractVariables(vars, stmt.List)
+func handleBlockStmt(vars []string, stmt *ast.BlockStmt) []string {
+	vars = extractVariables(vars, stmt.List)
 	return vars
 }
 
-func HandleIdents(vars []string, idents []*ast.Ident) []string {
+func handleIdents(vars []string, idents []*ast.Ident) []string {
 	for _, i := range idents {
 		vars = append(vars, i.Name)
 	}
 	return vars
 }
 
-func HandleExpr(vars []string, v ast.Expr) []string {
+func handleExpr(vars []string, v ast.Expr) []string {
 	switch expr := v.(type) {
 	case *ast.Ident:
 		vars = append(vars, expr.Name)
 	case *ast.CallExpr:
 		funcName := expr.Fun.(*ast.SelectorExpr).Sel.Name
 		if funcName == "Pry" || funcName == "Apply" {
-			contexts = append(contexts, PryContext{(int)(expr.Pos() - 1), (int)(expr.End() - 1), vars})
+			contexts = append(contexts, pryContext{(int)(expr.Pos() - 1), (int)(expr.End() - 1), vars})
 		}
 	default:
 		fmt.Printf("Unknown %T", expr)
@@ -359,7 +362,7 @@ func HandleExpr(vars []string, v ast.Expr) []string {
 	return vars
 }
 
-type PryContext struct {
+type pryContext struct {
 	Start, End int
 	Vars       []string
 }
