@@ -63,6 +63,20 @@ func TestMapLiteral(t *testing.T) {
 	}
 }
 
+func TestTypeCast(t *testing.T) {
+	scope := Scope{
+		"a": -1234.0,
+	}
+	out, err := InterpretString(scope, "int(a)")
+	if err != nil {
+		t.Error(err)
+	}
+	expected := -1234
+	if !reflect.DeepEqual(expected, out) {
+		t.Error(fmt.Sprintf("Expected %#v got %#v.", expected, out))
+	}
+}
+
 // Selectors and Ident
 func TestBasicIdent(t *testing.T) {
 	emptyScope := Scope{

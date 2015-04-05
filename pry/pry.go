@@ -19,12 +19,6 @@ func Pry(v ...interface{}) {
 
 // Apply drops into a pry shell in the location required.
 func Apply(v Scope) {
-	for _, v := range v {
-		p, isPackage := v.(Package)
-		if isPackage {
-			p.Process()
-		}
-	}
 	// disable input buffering
 	exec.Command("stty", "-F", "/dev/tty", "cbreak", "min", "1").Run()
 	// do not display entered characters on the screen
@@ -157,4 +151,9 @@ func Apply(v Scope) {
 			line = ""
 		}
 	}
+}
+
+// Type returns the reflect.Type of v. Used so packages don't need to import reflect.
+func Type(v interface{}) reflect.Type {
+	return reflect.TypeOf(v)
 }

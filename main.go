@@ -11,6 +11,7 @@ import (
 	"os/exec"
 	"os/signal"
 	"path/filepath"
+	"reflect"
 	"strings"
 
 	"github.com/d4l3k/go-pry/pry"
@@ -203,6 +204,10 @@ func main() {
 		})
 	}
 
+	if cmdArgs[0] == "apply" {
+		return
+	}
+
 	c := make(chan os.Signal, 1)
 	signal.Notify(c, os.Interrupt)
 	go func() {
@@ -242,26 +247,52 @@ func GetExports(pkg *ast.Package) string {
 	for name, file := range pkg.Files {
 		if !strings.HasSuffix(name, "_test.go") {
 			// Print the imports from the file's AST.
+			scope := pry.Scope{}
 			for k, obj := range file.Scope.Objects {
 				firstLetter := k[0:1]
 				if firstLetter == strings.ToUpper(firstLetter) && firstLetter != "_" {
-					vars += "\"" + k + "\": " + pkg.Name + "." + k
+
+					isType := false
+
 					switch stmt := obj.Decl.(type) {
-					case *ast.ValueSpec:
-						fmt.Printf("FILE %#v %#v\n", obj.Name, stmt.Values)
-						if len(stmt.Values) > 0 {
-							out, err := pry.InterpretExpr(pry.Scope{}, stmt.Values[0])
-							if err != nil {
-								fmt.Println("ERR", err)
-								//continue
+					/*
+						case *ast.ValueSpec:
+							if len(stmt.Values) > 0 {
+								out, err := pry.InterpretExpr(scope, stmt.Values[0])
+								if err != nil {
+									fmt.Println("ERR", err)
+									//continue
+								} else {
+									scope[obj.Name] = out
+								}
 							}
-							fmt.Println(out)
+					*/
+					case *ast.TypeSpec:
+						out, err := pry.InterpretExpr(scope, stmt.Type)
+						if err != nil {
+							fmt.Println("ERR", err)
+							//continue
+						} else {
+							scope[obj.Name] = out
+							isType = true
 						}
 					}
-					if obj.Kind == ast.Typ {
-						vars += "{}"
+
+					if obj.Kind != ast.Typ || isType {
+						path := pkg.Name + "." + k
+						vars += "\"" + k + "\": "
+						if isType {
+							zero := reflect.Zero(scope[obj.Name].(reflect.Type)).Interface()
+							vars += fmt.Sprintf("pry.Type(%s(%#v))", path, zero)
+
+						} else if path == "math.MaxUint64" {
+							// TODO Fix hack for Uint64
+							vars += "uint64(math.MaxUint64)"
+						} else {
+							vars += path
+						}
+						vars += ","
 					}
-					vars += ","
 				}
 			}
 		}
@@ -294,6 +325,8 @@ func handleStatement(vars []string, s ast.Stmt) []string {
 		for _, v := range lhsStatements {
 			vars = handleExpr(vars, v)
 		}
+	case *ast.GoStmt:
+		handleExpr(vars, stmt.Call)
 	case *ast.IfStmt:
 		handleIfStmt(vars, stmt)
 	case *ast.DeclStmt:
@@ -352,12 +385,19 @@ func handleExpr(vars []string, v ast.Expr) []string {
 	case *ast.Ident:
 		vars = append(vars, expr.Name)
 	case *ast.CallExpr:
-		funcName := expr.Fun.(*ast.SelectorExpr).Sel.Name
-		if funcName == "Pry" || funcName == "Apply" {
-			contexts = append(contexts, pryContext{(int)(expr.Pos() - 1), (int)(expr.End() - 1), vars})
+		switch fun := expr.Fun.(type) {
+		case *ast.SelectorExpr:
+			funcName := fun.Sel.Name
+			if funcName == "Pry" || funcName == "Apply" {
+				contexts = append(contexts, pryContext{(int)(expr.Pos() - 1), (int)(expr.End() - 1), vars})
+			}
+		case *ast.FuncLit:
+			handleStatement(vars, fun.Body)
+		default:
+			fmt.Printf("Unknown function type %T\n", fun)
 		}
 	default:
-		fmt.Printf("Unknown %T", expr)
+		fmt.Printf("Unknown %T\n", expr)
 	}
 	return vars
 }

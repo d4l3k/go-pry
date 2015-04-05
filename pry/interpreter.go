@@ -130,6 +130,7 @@ func InterpretExpr(scope Scope, expr ast.Expr) (interface{}, error) {
 		if err != nil {
 			return nil, err
 		}
+
 		args := make([]reflect.Value, len(e.Args))
 		for i, arg := range e.Args {
 			interpretedArg, err := InterpretExpr(scope, arg)
@@ -138,7 +139,14 @@ func InterpretExpr(scope Scope, expr ast.Expr) (interface{}, error) {
 			}
 			args[i] = reflect.ValueOf(interpretedArg)
 		}
+
+		funType, isType := fun.(reflect.Type)
+		if isType {
+			return args[0].Convert(funType).Interface(), nil
+		}
+
 		funVal := reflect.ValueOf(fun)
+
 		values := ValuesToInterfaces(funVal.Call(args))
 		if len(values) == 0 {
 			return nil, nil
