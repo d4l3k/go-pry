@@ -18,7 +18,7 @@ func Pry(v ...interface{}) {
 }
 
 // Apply drops into a pry shell in the location required.
-func Apply(v Scope) {
+func Apply(v *Scope) {
 	// disable input buffering
 	exec.Command("stty", "-F", "/dev/tty", "cbreak", "min", "1").Run()
 	// do not display entered characters on the screen
@@ -110,12 +110,12 @@ func Apply(v Scope) {
 		case 9: //TAB
 			if len(line) == 0 {
 				fmt.Println()
-				for k := range v {
+				for _, k := range v.Keys() {
 					fmt.Print(k + " ")
 				}
 				fmt.Println()
 			} else if line[len(line)-1] == '.' {
-				val, present := v[line[:len(line)-1]]
+				val, present := v.Get(line[:len(line)-1])
 				if present {
 					typeOf := reflect.TypeOf(val)
 					fmt.Println()

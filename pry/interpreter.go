@@ -12,10 +12,64 @@ import (
 )
 
 // Scope is a string-interface key-value pair that represents variables/functions in scope.
-type Scope map[string]interface{}
+type Scope struct {
+	Vals   map[string]interface{}
+	Parent *Scope
+}
+
+// NewScope creates a new initialized scope
+func NewScope() *Scope {
+	return &Scope{
+		map[string]interface{}{},
+		nil,
+	}
+}
+
+// Get walks the scope and finds the value of interest
+func (s *Scope) Get(name string) (val interface{}, exists bool) {
+	currentScope := s
+	for !exists && currentScope != nil {
+		val, exists = currentScope.Vals[name]
+		currentScope = s.Parent
+	}
+	return
+}
+
+// Set walks the scope and sets a value in a parent scope if it exists, else current.
+func (s *Scope) Set(name string, val interface{}) {
+	exists := false
+	currentScope := s
+	for !exists && currentScope != nil {
+		_, exists = currentScope.Vals[name]
+		if exists {
+			currentScope.Vals[name] = val
+		}
+		currentScope = s.Parent
+	}
+	if !exists {
+		s.Vals[name] = val
+	}
+}
+
+// Keys returns all keys in scope
+func (s *Scope) Keys() (keys []string) {
+	currentScope := s
+	for currentScope != nil {
+		for k := range currentScope.Vals {
+			keys = append(keys, k)
+		}
+		currentScope = s.Parent
+	}
+	return
+}
+
+// Func represents an interpreted function definition.
+type Func struct {
+	Def *ast.FuncLit
+}
 
 // InterpretString interprets a string of go code and returns the result.
-func InterpretString(scope Scope, exprStr string) (interface{}, error) {
+func InterpretString(scope *Scope, exprStr string) (interface{}, error) {
 
 	// TODO: Mild hack, should just parse string with wrapper
 	parts := strings.Split(exprStr, "=")
@@ -33,7 +87,7 @@ func InterpretString(scope Scope, exprStr string) (interface{}, error) {
 		if err == nil {
 			lhsIdent, isIdent := lhsExpr.(*ast.Ident)
 			if isIdent {
-				prevVal, exists := scope[lhsIdent.Name]
+				prevVal, exists := scope.Get(lhsIdent.Name)
 				// Enforce := and =
 				if !exists && !infer {
 					return nil, fmt.Errorf("Variable %#v is not defined.", lhsIdent.Name)
@@ -54,7 +108,8 @@ func InterpretString(scope Scope, exprStr string) (interface{}, error) {
 				if exists && reflect.TypeOf(prevVal) != reflect.TypeOf(val) {
 					return nil, fmt.Errorf("Error %#v is of type %T not %T.", lhsIdent.Name, prevVal, val)
 				}
-				scope[lhsIdent.Name] = val
+				// TODO walk scope
+				scope.Vals[lhsIdent.Name] = val
 				return val, nil
 			}
 		}
@@ -67,7 +122,7 @@ func InterpretString(scope Scope, exprStr string) (interface{}, error) {
 }
 
 // InterpretExpr interprets an ast.Expr and returns the value.
-func InterpretExpr(scope Scope, expr ast.Expr) (interface{}, error) {
+func InterpretExpr(scope *Scope, expr ast.Expr) (interface{}, error) {
 	builtinScope := map[string]interface{}{
 		"nil":    nil,
 		"true":   true,
@@ -84,8 +139,9 @@ func InterpretExpr(scope Scope, expr ast.Expr) (interface{}, error) {
 			return typ, err
 		}
 
-		obj, exists := scope[e.Name]
+		obj, exists := scope.Get(e.Name)
 		if !exists {
+			// TODO make builtinScope root of other scopes
 			obj, exists = builtinScope[e.Name]
 			if !exists {
 				return nil, errors.New(fmt.Sprint("Can't find EXPR ", e.Name))
@@ -140,9 +196,12 @@ func InterpretExpr(scope Scope, expr ast.Expr) (interface{}, error) {
 			args[i] = reflect.ValueOf(interpretedArg)
 		}
 
-		funType, isType := fun.(reflect.Type)
-		if isType {
-			return args[0].Convert(funType).Interface(), nil
+		switch funV := fun.(type) {
+		case reflect.Type:
+			return args[0].Convert(funV).Interface(), nil
+		case *Func:
+			// TODO enforce func return values
+			return InterpretStmt(scope, funV.Def.Body)
 		}
 
 		funVal := reflect.ValueOf(fun)
@@ -323,8 +382,48 @@ func InterpretExpr(scope Scope, expr ast.Expr) (interface{}, error) {
 	case *ast.ParenExpr:
 		return InterpretExpr(scope, e.X)
 
+	case *ast.FuncLit:
+		return &Func{e}, nil
+
 	default:
 		return nil, fmt.Errorf("Unknown EXPR %T", e)
+	}
+}
+
+// InterpretStmt interprets an ast.Stmt and returns the value.
+func InterpretStmt(scope *Scope, stmt ast.Stmt) (interface{}, error) {
+	switch s := stmt.(type) {
+	case *ast.BlockStmt:
+		var outFinal interface{}
+		for _, stmts := range s.List {
+			out, err := InterpretStmt(scope, stmts)
+			if err != nil {
+				return out, err
+			}
+			outFinal = out
+		}
+		return outFinal, nil
+	case *ast.ReturnStmt:
+		results := make([]interface{}, len(s.Results))
+		for i, result := range s.Results {
+			out, err := InterpretExpr(scope, result)
+			if err != nil {
+				return out, err
+			}
+			results[i] = out
+		}
+
+		if len(results) == 0 {
+			return nil, nil
+		} else if len(results) == 1 {
+			return results[0], nil
+		}
+		return results, nil
+
+	case *ast.ExprStmt:
+		return InterpretExpr(scope, s.X)
+	default:
+		return nil, fmt.Errorf("Unknown STMT %#v", s)
 	}
 }
 

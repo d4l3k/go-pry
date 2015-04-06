@@ -108,12 +108,12 @@ func InjectPry(filePath string) (string, error) {
 
 	for _, context := range contexts {
 		vars := filterVars(context.Vars)
-		obj := "map[string]interface{}{ "
+		obj := "&pry.Scope{Vals:map[string]interface{}{ "
 		for _, v := range vars {
 			obj += "\"" + v + "\": " + v + ", "
 		}
 		obj += strings.Join(packagePairs, "")
-		obj += "}"
+		obj += "}}"
 		text := "pry.Apply(" + obj + ")"
 		fileText = fileText[0:context.Start+offset] + text + fileText[context.End+offset:]
 		offset = len(text) - (context.End - context.Start)
@@ -131,7 +131,7 @@ func InjectPry(filePath string) (string, error) {
 
 func main() {
 	cmdArgs := os.Args[1:]
-	if len(cmdArgs) == 0 {
+	if len(cmdArgs) == 0 || cmdArgs[0] == "help" {
 		ExecuteGoCmd([]string{})
 		fmt.Println("----")
 		fmt.Println("go-pry is a wrapper around the go command.")
@@ -247,7 +247,7 @@ func GetExports(pkg *ast.Package) string {
 	for name, file := range pkg.Files {
 		if !strings.HasSuffix(name, "_test.go") {
 			// Print the imports from the file's AST.
-			scope := pry.Scope{}
+			scope := pry.NewScope()
 			for k, obj := range file.Scope.Objects {
 				firstLetter := k[0:1]
 				if firstLetter == strings.ToUpper(firstLetter) && firstLetter != "_" {
@@ -273,7 +273,7 @@ func GetExports(pkg *ast.Package) string {
 							fmt.Println("ERR", err)
 							//continue
 						} else {
-							scope[obj.Name] = out
+							scope.Set(obj.Name, out)
 							isType = true
 						}
 					}
@@ -282,7 +282,8 @@ func GetExports(pkg *ast.Package) string {
 						path := pkg.Name + "." + k
 						vars += "\"" + k + "\": "
 						if isType {
-							zero := reflect.Zero(scope[obj.Name].(reflect.Type)).Interface()
+							out, _ := scope.Get(obj.Name)
+							zero := reflect.Zero(out.(reflect.Type)).Interface()
 							vars += fmt.Sprintf("pry.Type(%s(%#v))", path, zero)
 
 						} else if path == "math.MaxUint64" {
