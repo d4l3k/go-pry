@@ -23,22 +23,22 @@ func Append(arr interface{}, elems ...interface{}) (interface{}, error) {
 func Make(t interface{}, args ...interface{}) (interface{}, error) {
 	typ, isType := t.(reflect.Type)
 	if !isType {
-		return nil, fmt.Errorf("Invalid type %#v", t)
+		return nil, fmt.Errorf("invalid type %#v", t)
 	}
 	switch typ.Kind() {
 	case reflect.Slice:
 		if len(args) < 1 || len(args) > 2 {
-			return nil, errors.New("Invalid number of arguments. Missing len or extra?")
+			return nil, errors.New("invalid number of arguments. Missing len or extra?")
 		}
 		length, isInt := args[0].(int)
 		if !isInt {
-			return nil, errors.New("Len is not int.")
+			return nil, errors.New("len is not int")
 		}
 		capacity := length
 		if len(args) == 2 {
 			capacity, isInt = args[0].(int)
 			if !isInt {
-				return nil, errors.New("Len is not int.")
+				return nil, errors.New("len is not int")
 			}
 		}
 		slice := reflect.MakeSlice(typ, length, capacity)
@@ -47,20 +47,20 @@ func Make(t interface{}, args ...interface{}) (interface{}, error) {
 	case reflect.Chan:
 		if len(args) > 1 {
 			fmt.Printf("CHAN ARGS %#v", args)
-			return nil, errors.New("Invalid number of arguments. Too many.")
+			return nil, errors.New("too many arguments")
 		}
 		size := 0
 		if len(args) == 1 {
 			var isInt bool
 			size, isInt = args[0].(int)
 			if !isInt {
-				return nil, errors.New("Size is not int.")
+				return nil, errors.New("size is not int")
 			}
 		}
 		buffer := reflect.MakeChan(typ, size)
 		return buffer.Interface(), nil
 
 	default:
-		return nil, fmt.Errorf("Unknown kind type %T", t)
+		return nil, fmt.Errorf("unknown kind type %T", t)
 	}
 }

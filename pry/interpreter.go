@@ -90,9 +90,9 @@ func InterpretString(scope *Scope, exprStr string) (interface{}, error) {
 				prevVal, exists := scope.Get(lhsIdent.Name)
 				// Enforce := and =
 				if !exists && !infer {
-					return nil, fmt.Errorf("Variable %#v is not defined.", lhsIdent.Name)
+					return nil, fmt.Errorf("variable %#v is not defined", lhsIdent.Name)
 				} else if exists && infer {
-					return nil, fmt.Errorf("Variable %#v is already defined.", lhsIdent.Name)
+					return nil, fmt.Errorf("variable %#v is already defined", lhsIdent.Name)
 				}
 
 				rhsExpr, err := parser.ParseExpr(rhs)
@@ -106,7 +106,7 @@ func InterpretString(scope *Scope, exprStr string) (interface{}, error) {
 
 				// Enforce types
 				if exists && reflect.TypeOf(prevVal) != reflect.TypeOf(val) {
-					return nil, fmt.Errorf("Error %#v is of type %T not %T.", lhsIdent.Name, prevVal, val)
+					return nil, fmt.Errorf("%#v is of type %T not %T", lhsIdent.Name, prevVal, val)
 				}
 				// TODO walk scope
 				scope.Vals[lhsIdent.Name] = val
@@ -144,7 +144,7 @@ func InterpretExpr(scope *Scope, expr ast.Expr) (interface{}, error) {
 			// TODO make builtinScope root of other scopes
 			obj, exists = builtinScope[e.Name]
 			if !exists {
-				return nil, errors.New(fmt.Sprint("Can't find EXPR ", e.Name))
+				return nil, fmt.Errorf("can't find EXPR %s", e.Name)
 			}
 		}
 		return obj, nil
@@ -167,7 +167,7 @@ func InterpretExpr(scope *Scope, expr ast.Expr) (interface{}, error) {
 			if isPresent {
 				return obj, nil
 			}
-			return nil, fmt.Errorf("Unknown field %#v", sel.Name)
+			return nil, fmt.Errorf("unknown field %#v", sel.Name)
 		}
 
 		zero := reflect.ValueOf(nil)
@@ -179,7 +179,7 @@ func InterpretExpr(scope *Scope, expr ast.Expr) (interface{}, error) {
 		if method != zero {
 			return method.Interface(), nil
 		}
-		return nil, fmt.Errorf("Unknown field %#v", sel.Name)
+		return nil, fmt.Errorf("unknown field %#v", sel.Name)
 
 	case *ast.CallExpr:
 		fun, err := InterpretExpr(scope, e.Fun)
@@ -226,7 +226,7 @@ func InterpretExpr(scope *Scope, expr ast.Expr) (interface{}, error) {
 		case token.STRING:
 			return e.Value[1 : len(e.Value)-1], nil
 		default:
-			return nil, fmt.Errorf("Unknown basic literal %d", e.Kind)
+			return nil, fmt.Errorf("unknown basic literal %d", e.Kind)
 		}
 
 	case *ast.CompositeLit:
@@ -264,13 +264,13 @@ func InterpretExpr(scope *Scope, expr ast.Expr) (interface{}, error) {
 					nMap.SetMapIndex(reflect.ValueOf(key), reflect.ValueOf(val))
 
 				default:
-					return nil, fmt.Errorf("Invalid element type %#v to map. Expecting key value pair.", eT)
+					return nil, fmt.Errorf("invalid element type %#v to map. Expecting key value pair", eT)
 				}
 			}
 			return nMap.Interface(), nil
 
 		default:
-			return nil, fmt.Errorf("Unknown composite literal %#v", t)
+			return nil, fmt.Errorf("unknown composite literal %#v", t)
 		}
 
 	case *ast.BinaryExpr:
@@ -343,7 +343,7 @@ func InterpretExpr(scope *Scope, expr ast.Expr) (interface{}, error) {
 
 		iVal, isInt := i.(int)
 		if !isInt {
-			return nil, fmt.Errorf("Index has to be an int not %T", i)
+			return nil, fmt.Errorf("index has to be an int not %T", i)
 		}
 		if iVal >= xVal.Len() || iVal < 0 {
 			return nil, errors.New("slice index out of range")
@@ -386,7 +386,7 @@ func InterpretExpr(scope *Scope, expr ast.Expr) (interface{}, error) {
 		return &Func{e}, nil
 
 	default:
-		return nil, fmt.Errorf("Unknown EXPR %T", e)
+		return nil, fmt.Errorf("unknown EXPR %T", e)
 	}
 }
 
@@ -423,7 +423,7 @@ func InterpretStmt(scope *Scope, stmt ast.Stmt) (interface{}, error) {
 	case *ast.ExprStmt:
 		return InterpretExpr(scope, s.X)
 	default:
-		return nil, fmt.Errorf("Unknown STMT %#v", s)
+		return nil, fmt.Errorf("unknown STMT %#v", s)
 	}
 }
 
@@ -453,7 +453,7 @@ func StringToType(str string) (reflect.Type, error) {
 	}
 	val, present := types[str]
 	if !present {
-		return nil, fmt.Errorf("Error type %#v is not in table.", str)
+		return nil, fmt.Errorf("type %#v is not in table", str)
 	}
 	return val, nil
 }

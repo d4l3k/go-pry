@@ -573,7 +573,7 @@ func ComputeBinaryOp(xI, yI interface{}, op token.Token) (interface{}, error) {
 	case token.NEQ:
 		return xI != yI, nil
 	}
-	return nil, fmt.Errorf("Unknown operation %#v between %#v and %#v", op, xI, yI)
+	return nil, fmt.Errorf("unknown operation %#v between %#v and %#v", op, xI, yI)
 }
 
 // ComputeUnaryOp computes the corresponding unary (+x, -x) operation on an interface.
@@ -706,5 +706,5 @@ func ComputeUnaryOp(xI interface{}, op token.Token) (interface{}, error) {
 			return -x, nil
 		}
 	}
-	return nil, fmt.Errorf("Unknown unary operation %#v on %#v", op, xI)
+	return nil, fmt.Errorf("unknown unary operation %#v on %#v", op, xI)
 }
