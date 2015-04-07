@@ -6,11 +6,15 @@ import (
 	"time"
 )
 
+func prying() {
+	fmt.Println("PRYING!")
+}
+
 func main() {
 	c := make(chan bool)
 	go func() {
+		prying()
 		pry.Pry()
-		fmt.Println("PRYING!")
 		c <- true
 	}()
 	<-c
