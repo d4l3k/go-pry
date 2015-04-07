@@ -4,3 +4,5 @@ go:
   - tip
 
 script: go test -v . ./pry
+install:
+  - go get -t -v . ./pry
