@@ -306,6 +306,25 @@ func TestAssign(t *testing.T) {
 	}
 }
 
+// Statements
+
+func TestFuncDeclAndCall(t *testing.T) {
+	scope := NewScope()
+
+	out, err := InterpretString(scope, "a := func(){ return 5 }")
+	if err != nil {
+		t.Error(err)
+	}
+	out, err = InterpretString(scope, "a()")
+	if err != nil {
+		t.Error(err)
+	}
+	expected := 5
+	if !reflect.DeepEqual(expected, out) {
+		t.Errorf("Expected %#v got %#v.", expected, out)
+	}
+}
+
 // TODO Packages
 
 // TODO References
