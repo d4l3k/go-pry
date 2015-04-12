@@ -18,7 +18,7 @@ func Pry(v ...interface{}) {
 }
 
 // Apply drops into a pry shell in the location required.
-func Apply(v *Scope) {
+func Apply(scope *Scope) {
 	// disable input buffering
 	exec.Command("stty", "-F", "/dev/tty", "cbreak", "min", "1").Run()
 	// do not display entered characters on the screen
@@ -108,28 +108,22 @@ func Apply(v *Scope) {
 			}
 		case 27: // ? These two happen on key press
 		case 9: //TAB
-			if len(line) == 0 {
-				fmt.Println()
-				for _, k := range v.Keys() {
-					fmt.Print(k + " ")
-				}
-				fmt.Println()
-			} else if line[len(line)-1] == '.' {
-				val, present := v.Get(line[:len(line)-1])
-				if present {
-					typeOf := reflect.TypeOf(val)
-					fmt.Println()
-					methods := make([]string, typeOf.NumMethod())
-					for i := range methods {
-						methods[i] = typeOf.Method(i).Name + "("
-					}
-					fields := make([]string, typeOf.NumField())
-					for i := range fields {
-						fields[i] = typeOf.Field(i).Name
-					}
-					fmt.Println(typeOf.Name() + ": " + strings.Join(fields, " ") + " " + strings.Join(methods, " "))
+			suggestions := scope.Suggestions(line)
+			maxLength := 0
+			for _, term := range suggestions {
+				if len(term) > maxLength {
+					maxLength = len(term)
 				}
 			}
+			for _, term := range suggestions {
+				paddedTerm := term
+				for len(paddedTerm) < maxLength {
+					paddedTerm += " "
+				}
+				fmt.Printf("\033[1A%s\033[%dD", ansi.Color(paddedTerm, "white+b:magenta"), len(paddedTerm))
+			}
+			fmt.Printf("\033[%dB", len(suggestions))
+			//fmt.Println(strings.Join(suggestions, " "))
 		case 10: //ENTER
 			fmt.Println()
 			if len(line) == 0 {
@@ -138,7 +132,7 @@ func Apply(v *Scope) {
 			if line == "continue" || line == "exit" {
 				return
 			}
-			resp, err := InterpretString(v, line)
+			resp, err := scope.InterpretString(line)
 			if err != nil {
 				fmt.Println("Error: ", err)
 			} else {

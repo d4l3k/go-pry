@@ -26,39 +26,39 @@ func NewScope() *Scope {
 }
 
 // Get walks the scope and finds the value of interest
-func (s *Scope) Get(name string) (val interface{}, exists bool) {
-	currentScope := s
+func (scope *Scope) Get(name string) (val interface{}, exists bool) {
+	currentScope := scope
 	for !exists && currentScope != nil {
 		val, exists = currentScope.Vals[name]
-		currentScope = s.Parent
+		currentScope = scope.Parent
 	}
 	return
 }
 
 // Set walks the scope and sets a value in a parent scope if it exists, else current.
-func (s *Scope) Set(name string, val interface{}) {
+func (scope *Scope) Set(name string, val interface{}) {
 	exists := false
-	currentScope := s
+	currentScope := scope
 	for !exists && currentScope != nil {
 		_, exists = currentScope.Vals[name]
 		if exists {
 			currentScope.Vals[name] = val
 		}
-		currentScope = s.Parent
+		currentScope = scope.Parent
 	}
 	if !exists {
-		s.Vals[name] = val
+		scope.Vals[name] = val
 	}
 }
 
 // Keys returns all keys in scope
-func (s *Scope) Keys() (keys []string) {
-	currentScope := s
+func (scope *Scope) Keys() (keys []string) {
+	currentScope := scope
 	for currentScope != nil {
 		for k := range currentScope.Vals {
 			keys = append(keys, k)
 		}
-		currentScope = s.Parent
+		currentScope = scope.Parent
 	}
 	return
 }
@@ -69,60 +69,21 @@ type Func struct {
 }
 
 // InterpretString interprets a string of go code and returns the result.
-func InterpretString(scope *Scope, exprStr string) (interface{}, error) {
-
-	// TODO: Mild hack, should just parse string with wrapper
-	parts := strings.Split(exprStr, "=")
-	if len(parts) == 2 && len(parts[0]) > 0 && len(parts[1]) > 0 {
-		lhs := parts[0]
-		rhs := parts[1]
-
-		infer := lhs[len(lhs)-1:] == ":"
-		if infer {
-			lhs = lhs[:len(lhs)-1]
-		}
-		lhsExpr, err := parser.ParseExpr(lhs)
-
-		// Ignore this error and fall back to standard parser
-		if err == nil {
-			lhsIdent, isIdent := lhsExpr.(*ast.Ident)
-			if isIdent {
-				prevVal, exists := scope.Get(lhsIdent.Name)
-				// Enforce := and =
-				if !exists && !infer {
-					return nil, fmt.Errorf("variable %#v is not defined", lhsIdent.Name)
-				} else if exists && infer {
-					return nil, fmt.Errorf("variable %#v is already defined", lhsIdent.Name)
-				}
-
-				rhsExpr, err := parser.ParseExpr(rhs)
-				if err != nil {
-					return nil, err
-				}
-				val, err := InterpretExpr(scope, rhsExpr)
-				if err != nil {
-					return nil, err
-				}
-
-				// Enforce types
-				if exists && reflect.TypeOf(prevVal) != reflect.TypeOf(val) {
-					return nil, fmt.Errorf("%#v is of type %T not %T", lhsIdent.Name, prevVal, val)
-				}
-				// TODO walk scope
-				scope.Vals[lhsIdent.Name] = val
-				return val, nil
-			}
-		}
+func (scope *Scope) InterpretString(exprStr string) (interface{}, error) {
+	exprStr = strings.Trim(exprStr, " \n\t")
+	wrappedExpr := "func(){" + exprStr + "}()"
+	expr, err := parser.ParseExpr(wrappedExpr)
+	if err != nil && strings.HasPrefix(err.Error(), "1:8: expected statement, found '") {
+		expr, err = parser.ParseExpr(exprStr)
 	}
-	expr, err := parser.ParseExpr(exprStr)
 	if err != nil {
 		return nil, err
 	}
-	return InterpretExpr(scope, expr)
+	return scope.InterpretExpr(expr)
 }
 
 // InterpretExpr interprets an ast.Expr and returns the value.
-func InterpretExpr(scope *Scope, expr ast.Expr) (interface{}, error) {
+func (scope *Scope) InterpretExpr(expr ast.Expr) (interface{}, error) {
 	builtinScope := map[string]interface{}{
 		"nil":    nil,
 		"true":   true,
@@ -150,7 +111,7 @@ func InterpretExpr(scope *Scope, expr ast.Expr) (interface{}, error) {
 		return obj, nil
 
 	case *ast.SelectorExpr:
-		X, err := InterpretExpr(scope, e.X)
+		X, err := scope.InterpretExpr(e.X)
 		if err != nil {
 			return nil, err
 		}
@@ -182,14 +143,14 @@ func InterpretExpr(scope *Scope, expr ast.Expr) (interface{}, error) {
 		return nil, fmt.Errorf("unknown field %#v", sel.Name)
 
 	case *ast.CallExpr:
-		fun, err := InterpretExpr(scope, e.Fun)
+		fun, err := scope.InterpretExpr(e.Fun)
 		if err != nil {
 			return nil, err
 		}
 
 		args := make([]reflect.Value, len(e.Args))
 		for i, arg := range e.Args {
-			interpretedArg, err := InterpretExpr(scope, arg)
+			interpretedArg, err := scope.InterpretExpr(arg)
 			if err != nil {
 				return nil, err
 			}
@@ -230,7 +191,7 @@ func InterpretExpr(scope *Scope, expr ast.Expr) (interface{}, error) {
 		}
 
 	case *ast.CompositeLit:
-		typ, err := InterpretExpr(scope, e.Type)
+		typ, err := scope.InterpretExpr(e.Type)
 		if err != nil {
 			return nil, err
 		}
@@ -240,7 +201,7 @@ func InterpretExpr(scope *Scope, expr ast.Expr) (interface{}, error) {
 			l := len(e.Elts)
 			slice := reflect.MakeSlice(typ.(reflect.Type), l, l)
 			for i, elem := range e.Elts {
-				elemValue, err := InterpretExpr(scope, elem)
+				elemValue, err := scope.InterpretExpr(elem)
 				if err != nil {
 					return nil, err
 				}
@@ -253,11 +214,11 @@ func InterpretExpr(scope *Scope, expr ast.Expr) (interface{}, error) {
 			for _, elem := range e.Elts {
 				switch eT := elem.(type) {
 				case *ast.KeyValueExpr:
-					key, err := InterpretExpr(scope, eT.Key)
+					key, err := scope.InterpretExpr(eT.Key)
 					if err != nil {
 						return nil, err
 					}
-					val, err := InterpretExpr(scope, eT.Value)
+					val, err := scope.InterpretExpr(eT.Value)
 					if err != nil {
 						return nil, err
 					}
@@ -274,25 +235,25 @@ func InterpretExpr(scope *Scope, expr ast.Expr) (interface{}, error) {
 		}
 
 	case *ast.BinaryExpr:
-		x, err := InterpretExpr(scope, e.X)
+		x, err := scope.InterpretExpr(e.X)
 		if err != nil {
 			return nil, err
 		}
-		y, err := InterpretExpr(scope, e.Y)
+		y, err := scope.InterpretExpr(e.Y)
 		if err != nil {
 			return nil, err
 		}
 		return ComputeBinaryOp(x, y, e.Op)
 
 	case *ast.UnaryExpr:
-		x, err := InterpretExpr(scope, e.X)
+		x, err := scope.InterpretExpr(e.X)
 		if err != nil {
 			return nil, err
 		}
 		return ComputeUnaryOp(x, e.Op)
 
 	case *ast.ArrayType:
-		typ, err := InterpretExpr(scope, e.Elt)
+		typ, err := scope.InterpretExpr(e.Elt)
 		if err != nil {
 			return nil, err
 		}
@@ -300,11 +261,11 @@ func InterpretExpr(scope *Scope, expr ast.Expr) (interface{}, error) {
 		return arrType, nil
 
 	case *ast.MapType:
-		keyType, err := InterpretExpr(scope, e.Key)
+		keyType, err := scope.InterpretExpr(e.Key)
 		if err != nil {
 			return nil, err
 		}
-		valType, err := InterpretExpr(scope, e.Value)
+		valType, err := scope.InterpretExpr(e.Value)
 		if err != nil {
 			return nil, err
 		}
@@ -312,7 +273,7 @@ func InterpretExpr(scope *Scope, expr ast.Expr) (interface{}, error) {
 		return mapType, nil
 
 	case *ast.ChanType:
-		typeI, err := InterpretExpr(scope, e.Value)
+		typeI, err := scope.InterpretExpr(e.Value)
 		if err != nil {
 			return nil, err
 		}
@@ -323,11 +284,11 @@ func InterpretExpr(scope *Scope, expr ast.Expr) (interface{}, error) {
 		return reflect.ChanOf(reflect.BothDir, typ), nil
 
 	case *ast.IndexExpr:
-		X, err := InterpretExpr(scope, e.X)
+		X, err := scope.InterpretExpr(e.X)
 		if err != nil {
 			return nil, err
 		}
-		i, err := InterpretExpr(scope, e.Index)
+		i, err := scope.InterpretExpr(e.Index)
 		if err != nil {
 			return nil, err
 		}
@@ -350,15 +311,15 @@ func InterpretExpr(scope *Scope, expr ast.Expr) (interface{}, error) {
 		}
 		return xVal.Index(iVal).Interface(), nil
 	case *ast.SliceExpr:
-		low, err := InterpretExpr(scope, e.Low)
+		low, err := scope.InterpretExpr(e.Low)
 		if err != nil {
 			return nil, err
 		}
-		high, err := InterpretExpr(scope, e.High)
+		high, err := scope.InterpretExpr(e.High)
 		if err != nil {
 			return nil, err
 		}
-		X, err := InterpretExpr(scope, e.X)
+		X, err := scope.InterpretExpr(e.X)
 		if err != nil {
 			return nil, err
 		}
@@ -380,7 +341,7 @@ func InterpretExpr(scope *Scope, expr ast.Expr) (interface{}, error) {
 		return xVal.Slice(lowVal, highVal).Interface(), nil
 
 	case *ast.ParenExpr:
-		return InterpretExpr(scope, e.X)
+		return scope.InterpretExpr(e.X)
 
 	case *ast.FuncLit:
 		return &Func{e}, nil
@@ -403,10 +364,11 @@ func InterpretStmt(scope *Scope, stmt ast.Stmt) (interface{}, error) {
 			outFinal = out
 		}
 		return outFinal, nil
+
 	case *ast.ReturnStmt:
 		results := make([]interface{}, len(s.Results))
 		for i, result := range s.Results {
-			out, err := InterpretExpr(scope, result)
+			out, err := scope.InterpretExpr(result)
 			if err != nil {
 				return out, err
 			}
@@ -420,8 +382,59 @@ func InterpretStmt(scope *Scope, stmt ast.Stmt) (interface{}, error) {
 		}
 		return results, nil
 
+	case *ast.AssignStmt:
+		// TODO implement type checking
+		define := s.Tok == token.DEFINE
+		lhs := make([]string, len(s.Lhs))
+		for i, id := range s.Lhs {
+			lhsIdent, isIdent := id.(*ast.Ident)
+			if !isIdent {
+				return nil, fmt.Errorf("%#v assignment is not ident", id)
+			}
+			lhs[i] = lhsIdent.Name
+		}
+		rhs := make([]interface{}, len(s.Rhs))
+		for i, expr := range s.Rhs {
+			val, err := scope.InterpretExpr(expr)
+			if err != nil {
+				return nil, err
+			}
+			rhs[i] = val
+		}
+		if len(rhs) != 1 && len(rhs) != len(lhs) {
+			return nil, fmt.Errorf("assignment count mismatch: %d = %d", len(lhs), len(rhs))
+		}
+		if len(rhs) == 1 && reflect.TypeOf(rhs[0]).Kind() == reflect.Slice {
+			rhsV := reflect.ValueOf(rhs[0])
+			rhsLen := rhsV.Len()
+			if rhsLen != len(lhs) {
+				return nil, fmt.Errorf("assignment count mismatch: %d = %d", len(lhs), rhsLen)
+			}
+			for i := 0; i < rhsLen; i++ {
+				variable := lhs[i]
+				_, exists := scope.Get(variable)
+				if !exists && !define {
+					return nil, fmt.Errorf("variable %#v is not defined", variable)
+				}
+				scope.Set(variable, rhsV.Index(i).Interface())
+			}
+		} else {
+			for i, r := range rhs {
+				variable := lhs[i]
+				_, exists := scope.Get(variable)
+				if !exists && !define {
+					return nil, fmt.Errorf("variable %#v is not defined", variable)
+				}
+				scope.Set(variable, r)
+			}
+		}
+		if len(rhs) > 1 {
+			return rhs, nil
+		}
+		return rhs[0], nil
+
 	case *ast.ExprStmt:
-		return InterpretExpr(scope, s.X)
+		return scope.InterpretExpr(s.X)
 	default:
 		return nil, fmt.Errorf("unknown STMT %#v", s)
 	}

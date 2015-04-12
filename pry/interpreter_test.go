@@ -7,8 +7,8 @@ import (
 
 // Literals
 func TestStringLiteral(t *testing.T) {
-	emptyScope := NewScope()
-	out, err := InterpretString(emptyScope, "\"Hello!\"")
+	scope := NewScope()
+	out, err := scope.InterpretString("\"Hello!\"")
 	if err != nil {
 		t.Error(err)
 	}
@@ -17,8 +17,8 @@ func TestStringLiteral(t *testing.T) {
 	}
 }
 func TestIntLiteral(t *testing.T) {
-	emptyScope := NewScope()
-	out, err := InterpretString(emptyScope, "-1234")
+	scope := NewScope()
+	out, err := scope.InterpretString("-1234")
 	if err != nil {
 		t.Error(err)
 	}
@@ -27,8 +27,8 @@ func TestIntLiteral(t *testing.T) {
 	}
 }
 func TestCharLiteral(t *testing.T) {
-	emptyScope := NewScope()
-	out, err := InterpretString(emptyScope, "'a'")
+	scope := NewScope()
+	out, err := scope.InterpretString("'a'")
 	if err != nil {
 		t.Error(err)
 	}
@@ -37,8 +37,8 @@ func TestCharLiteral(t *testing.T) {
 	}
 }
 func TestArrayLiteral(t *testing.T) {
-	emptyScope := NewScope()
-	out, err := InterpretString(emptyScope, "[]int{1,2,3,4}")
+	scope := NewScope()
+	out, err := scope.InterpretString("[]int{1,2,3,4}")
 	if err != nil {
 		t.Error(err)
 	}
@@ -48,8 +48,8 @@ func TestArrayLiteral(t *testing.T) {
 	}
 }
 func TestMapLiteral(t *testing.T) {
-	emptyScope := NewScope()
-	out, err := InterpretString(emptyScope, "map[string]int{\"duck\": 5,\n \"banana\": -123,\n}")
+	scope := NewScope()
+	out, err := scope.InterpretString("map[string]int{\"duck\": 5,\n \"banana\": -123,\n}")
 	if err != nil {
 		t.Error(err)
 	}
@@ -65,7 +65,7 @@ func TestMapLiteral(t *testing.T) {
 func TestTypeCast(t *testing.T) {
 	scope := NewScope()
 	scope.Set("a", -1234.0)
-	out, err := InterpretString(scope, "int(a)")
+	out, err := scope.InterpretString("int(a)")
 	if err != nil {
 		t.Error(err)
 	}
@@ -79,7 +79,7 @@ func TestTypeCast(t *testing.T) {
 func TestBasicIdent(t *testing.T) {
 	scope := NewScope()
 	scope.Set("a", 5)
-	out, err := InterpretString(scope, "a")
+	out, err := scope.InterpretString("a")
 	if err != nil {
 		t.Error(err)
 	}
@@ -90,7 +90,7 @@ func TestBasicIdent(t *testing.T) {
 }
 func TestMissingBasicIdent(t *testing.T) {
 	scope := NewScope()
-	out, err := InterpretString(scope, "a")
+	out, err := scope.InterpretString("a")
 	if err == nil || out != nil {
 		t.Error("Found non-existant ident.")
 	}
@@ -100,7 +100,7 @@ func TestMapIdent(t *testing.T) {
 	scope.Set("a", map[string]int{
 		"B": 10,
 	})
-	out, err := InterpretString(scope, "a[\"B\"]")
+	out, err := scope.InterpretString("a[\"B\"]")
 	if err != nil {
 		t.Error(err)
 	}
@@ -113,7 +113,7 @@ func TestMissingMapIdent(t *testing.T) {
 	scope := NewScope()
 	scope.Set("a", map[string]int{})
 
-	out, err := InterpretString(scope, "a[\"b\"]")
+	out, err := scope.InterpretString("a[\"b\"]")
 	if err != nil {
 		t.Error(err)
 	}
@@ -125,7 +125,7 @@ func TestArrIdent(t *testing.T) {
 	scope := NewScope()
 	scope.Set("a", []int{1, 2, 3})
 
-	out, err := InterpretString(scope, "a[1]")
+	out, err := scope.InterpretString("a[1]")
 	if err != nil {
 		t.Error(err)
 	}
@@ -139,7 +139,7 @@ func TestMissingArrIdent(t *testing.T) {
 	scope := NewScope()
 	scope.Set("a", []int{1})
 
-	out, err := InterpretString(scope, "a[1]")
+	out, err := scope.InterpretString("a[1]")
 	if err == nil || out != nil {
 		t.Error("Should have thrown out of range error")
 	}
@@ -149,7 +149,7 @@ func TestSlice(t *testing.T) {
 	scope := NewScope()
 	scope.Set("a", []int{1, 2, 3, 4})
 
-	out, err := InterpretString(scope, "a[1:3]")
+	out, err := scope.InterpretString("a[1:3]")
 	if err != nil {
 		t.Error(err)
 	}
@@ -161,7 +161,8 @@ func TestSlice(t *testing.T) {
 
 // Structs
 type testStruct struct {
-	A int
+	A    int
+	C, D string
 }
 
 func (a testStruct) B() int {
@@ -170,9 +171,9 @@ func (a testStruct) B() int {
 
 func TestSelector(t *testing.T) {
 	scope := NewScope()
-	scope.Set("a", testStruct{1})
+	scope.Set("a", testStruct{A: 1})
 
-	out, err := InterpretString(scope, "a.A")
+	out, err := scope.InterpretString("a.A")
 	if err != nil {
 		t.Error(err)
 	}
@@ -183,9 +184,9 @@ func TestSelector(t *testing.T) {
 }
 func TestSelectorFunc(t *testing.T) {
 	scope := NewScope()
-	scope.Set("a", testStruct{1})
+	scope.Set("a", testStruct{A: 1})
 
-	out, err := InterpretString(scope, "a.B()")
+	out, err := scope.InterpretString("a.B()")
 	if err != nil {
 		t.Error(err)
 	}
@@ -207,7 +208,7 @@ func TestBasicMath(t *testing.T) {
 		"1.0 + 2.0":  3.0,
 	}
 	for k, expected := range pairs {
-		out, err := InterpretString(scope, k)
+		out, err := scope.InterpretString(k)
 		if err != nil {
 			t.Error(err)
 		}
@@ -221,7 +222,7 @@ func TestParens(t *testing.T) {
 	scope := NewScope()
 	scope.Set("a", 5)
 
-	out, err := InterpretString(scope, "((10) * (a))")
+	out, err := scope.InterpretString("((10) * (a))")
 	if err != nil {
 		t.Error(err)
 	}
@@ -233,8 +234,8 @@ func TestParens(t *testing.T) {
 
 // Test Make
 func TestMakeSlice(t *testing.T) {
-	emptyScope := NewScope()
-	out, err := InterpretString(emptyScope, "make([]int, 1, 10)")
+	scope := NewScope()
+	out, err := scope.InterpretString("make([]int, 1, 10)")
 	if err != nil {
 		t.Error(err)
 	}
@@ -244,8 +245,8 @@ func TestMakeSlice(t *testing.T) {
 	}
 }
 func TestMakeChan(t *testing.T) {
-	emptyScope := NewScope()
-	out, err := InterpretString(emptyScope, "make(chan int, 10)")
+	scope := NewScope()
+	out, err := scope.InterpretString("make(chan int, 10)")
 	if err != nil {
 		t.Error(err)
 	}
@@ -255,8 +256,8 @@ func TestMakeChan(t *testing.T) {
 	}
 }
 func TestMakeUnknown(t *testing.T) {
-	emptyScope := NewScope()
-	out, err := InterpretString(emptyScope, "make(int)")
+	scope := NewScope()
+	out, err := scope.InterpretString("make(int)")
 	if err == nil || out != nil {
 		t.Error("Should have thrown error.")
 	}
@@ -266,7 +267,7 @@ func TestAppend(t *testing.T) {
 	scope := NewScope()
 	scope.Set("a", []int{1})
 
-	out, err := InterpretString(scope, "append(a, 2, 3)")
+	out, err := scope.InterpretString("append(a, 2, 3)")
 	if err != nil {
 		t.Error(err)
 	}
@@ -281,7 +282,7 @@ func TestDeclareAssign(t *testing.T) {
 	scope := NewScope()
 	scope.Set("a", []int{1})
 
-	out, err := InterpretString(scope, "b := 2")
+	out, err := scope.InterpretString("b := 2")
 	if err != nil {
 		t.Error(err)
 	}
@@ -295,7 +296,7 @@ func TestAssign(t *testing.T) {
 	scope := NewScope()
 	scope.Set("a", 1)
 
-	out, err := InterpretString(scope, "a = 2")
+	out, err := scope.InterpretString("a = 2")
 	if err != nil {
 		t.Error(err)
 	}
@@ -311,11 +312,11 @@ func TestAssign(t *testing.T) {
 func TestFuncDeclAndCall(t *testing.T) {
 	scope := NewScope()
 
-	out, err := InterpretString(scope, "a := func(){ return 5 }")
+	out, err := scope.InterpretString("a := func(){ return 5 }")
 	if err != nil {
 		t.Error(err)
 	}
-	out, err = InterpretString(scope, "a()")
+	out, err = scope.InterpretString("a()")
 	if err != nil {
 		t.Error(err)
 	}

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"go/ast"
 	"go/build"
@@ -35,7 +36,7 @@ func ExecuteGoCmd(args []string) {
 
 // InjectPry walks the scope and replaces pry.Pry with pry.Apply(pry.Scope{...}).
 func InjectPry(filePath string) (string, error) {
-	fmt.Println("Prying into ", filePath)
+	Debug("Prying into %s\n", filePath)
 
 	contexts = make([]pryContext, 0)
 
@@ -47,8 +48,6 @@ func InjectPry(filePath string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-
-	fmt.Println(f.Imports)
 
 	packagePairs := []string{}
 	for _, imp := range f.Imports {
@@ -81,7 +80,6 @@ func InjectPry(filePath string) (string, error) {
 		case *ast.FuncDecl:
 			funcs = append(funcs, decl)
 		case *ast.ValueSpec:
-			fmt.Println(k, decl)
 			vars = append(vars, k)
 		}
 	}
@@ -104,7 +102,7 @@ func InjectPry(filePath string) (string, error) {
 		return "", nil
 	}
 
-	fmt.Println(" :: Found", len(contexts), "pry statements.")
+	Debug(" :: Found %d pry statements.\n", len(contexts))
 
 	for _, context := range contexts {
 		vars := filterVars(context.Vars)
@@ -129,14 +127,53 @@ func InjectPry(filePath string) (string, error) {
 	return filePath, nil
 }
 
+// GenerateFile generates and executes a temp file with the given imports
+func GenerateFile(imports []string) error {
+	f, err := ioutil.TempFile("", "pry")
+	if err != nil {
+		return err
+	}
+	f.WriteString("package main\nimport (\n\t\"github.com/d4l3k/go-pry/pry\"\n\n")
+	for _, imp := range imports {
+		f.WriteString(fmt.Sprintf("\t%#v\n", imp))
+	}
+	f.WriteString(")\nfunc main() {\n\tpry.Pry()\n}")
+	f.Close()
+
+	oldPath := f.Name()
+	newPath := f.Name() + ".go"
+	os.Rename(oldPath, newPath)
+	InjectPry(newPath)
+	ExecuteGoCmd([]string{"run", newPath})
+	RevertPry([]string{newPath})
+	os.Remove(newPath)
+	return nil
+}
+
+var debug bool
+
 func main() {
-	cmdArgs := os.Args[1:]
-	if len(cmdArgs) == 0 || cmdArgs[0] == "help" {
+	// FLAGS
+	imports := flag.String("i", "fmt,math", "packages to import, comma seperated")
+	flag.BoolVar(&debug, "d", false, "display debug statements")
+
+	cmdArgs := flag.Args()
+	flag.CommandLine.Usage = func() {
 		ExecuteGoCmd([]string{})
 		fmt.Println("----")
-		fmt.Println("go-pry is a wrapper around the go command.")
+		fmt.Println("go-pry is an interactive REPL and wrapper around the go command.")
 		fmt.Println("You can execute go commands as normal and go-pry will take care of generating the pry code.")
-		fmt.Println("You can also use 'go-pry revert' to cleanup go-pry generated files. They should automatically be removed.")
+		fmt.Println("Running go-pry with no arguments will drop you into an interactive REPL.")
+		flag.PrintDefaults()
+		fmt.Println("  revert: cleans up go-pry generated files if not automatically done")
+		return
+	}
+	flag.Parse()
+	if len(cmdArgs) == 0 {
+		err := GenerateFile(strings.Split(*imports, ","))
+		if err != nil {
+			panic(err)
+		}
 		return
 	}
 
@@ -241,6 +278,13 @@ func RevertPry(modifiedFiles []string) {
 	}
 }
 
+// Debug prints debug statements if debug is true.
+func Debug(k ...interface{}) {
+	if debug {
+		fmt.Println(k...)
+	}
+}
+
 // GetExports returns a string of gocode that represents the exports (constants/functions) of an ast.Package.
 func GetExports(pkg *ast.Package) string {
 	vars := ""
@@ -268,9 +312,9 @@ func GetExports(pkg *ast.Package) string {
 							}
 					*/
 					case *ast.TypeSpec:
-						out, err := pry.InterpretExpr(scope, stmt.Type)
+						out, err := scope.InterpretExpr(stmt.Type)
 						if err != nil {
-							fmt.Println("ERR", err)
+							Debug("ERR %s\n", err.Error())
 							//continue
 						} else {
 							scope.Set(obj.Name, out)
@@ -345,7 +389,7 @@ func handleStatement(vars []string, s ast.Stmt) []string {
 	case *ast.ForStmt:
 		vars = handleForStmt(vars, stmt)
 	default:
-		fmt.Printf("Unknown %T\n", stmt)
+		Debug("Unknown %T\n", stmt)
 	}
 	return vars
 }
@@ -395,7 +439,7 @@ func handleExpr(vars []string, v ast.Expr) []string {
 		case *ast.FuncLit:
 			handleStatement(vars, fun.Body)
 		default:
-			fmt.Printf("Unknown function type %T\n", fun)
+			Debug("Unknown function type %T\n", fun)
 		}
 	default:
 		fmt.Printf("Unknown %T\n", expr)
