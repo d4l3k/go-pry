@@ -64,9 +64,10 @@ func Apply(scope *Scope) {
 
 	line := ""
 	count := 0
+	index := 0
 	b := make([]byte, 1)
 	for {
-		fmt.Printf("\r\033[K[%d] go-pry> %s \033[1D", currentPos, Highlight(line))
+		fmt.Printf("\r\033[K[%d] go-pry> %s \033[%dD", currentPos, Highlight(line), len(line)-index+1)
 		bPrev := b[0]
 		os.Stdin.Read(b)
 		switch b[0] {
@@ -85,6 +86,7 @@ func Apply(scope *Scope) {
 					} else {
 						line = history[currentPos]
 					}
+					index = len(line)
 					continue
 				case 65: // Up
 					currentPos--
@@ -94,19 +96,42 @@ func Apply(scope *Scope) {
 					if len(history) > 0 {
 						line = history[currentPos]
 					}
+					index = len(line)
 					continue
 				case 67: // Right
+					index++
+					if index > len(line) {
+						index = len(line)
+					}
 					continue
 				case 68: // Left
+					index--
+					if index < 0 {
+						index = 0
+					}
 					continue
 				}
+			} else if bPrev == 51 && b[0] == 126 { // DELETE
+				if len(line) > 0 && index < len(line) {
+					line = line[:index] + line[index+1:]
+				}
+				if index > len(line) {
+					index = len(line)
+				}
+				continue
 			}
-			line += string(b)
+			line = line[:index] + string(b) + line[index:]
+			index++
 		case 127: // Backspace
 			if len(line) > 0 {
-				line = line[:len(line)-1]
+				line = line[:index-1] + line[index:]
+				index--
 			}
-		case 27: // ? These two happen on key press
+			if index > len(line) {
+				index = len(line)
+			}
+		case 27: // ? This happens on key press
+		case 51: // ? This happens on delete
 		case 9: //TAB
 			suggestions := scope.Suggestions(line)
 			maxLength := 0
@@ -143,6 +168,7 @@ func Apply(scope *Scope) {
 			count++
 			currentPos = count
 			line = ""
+			index = 0
 		}
 	}
 }
