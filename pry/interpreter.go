@@ -557,20 +557,15 @@ func (scope *Scope) Render(x ast.Node) string {
 
 // TypeCheck does type checking and returns the info object
 func (scope *Scope) TypeCheck() (*types.Info, []error) {
-	var errors []error
+	var errs []error
 	scope.config.Error = func(err error) {
-		fmt.Println("ERR", err)
 		if !strings.HasSuffix(err.Error(), "not used") {
-			errors = append(errors, err)
+			errs = append(errs, errors.New(strings.TrimPrefix(err.Error(), scope.path)))
 		}
 	}
 	info := &types.Info{}
-	_, err := scope.config.Check(filepath.Dir(scope.path), scope.fset, scope.files, info)
-	if err != nil {
-		fmt.Println("ERR2", err)
-		//errors = append(errors, err)
-	}
-	return info, errors
+	scope.config.Check(filepath.Dir(scope.path), scope.fset, scope.files, info)
+	return info, errs
 }
 
 // StringToType returns the reflect.Type corresponding to the type string provided. Ex: StringToType("int")
