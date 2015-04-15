@@ -28,6 +28,12 @@ func Apply(scope *Scope) {
 
 	_, filePathRaw, lineNum, _ := runtime.Caller(1)
 	filePath := filepath.Dir(filePathRaw) + "/." + filepath.Base(filePathRaw) + "pry"
+
+	err := scope.ConfigureTypes(filePath, lineNum)
+	if err != nil {
+		panic(err)
+	}
+
 	fmt.Printf("\nFrom %s @ line %d :\n\n", filePathRaw, lineNum)
 	file, err := ioutil.ReadFile(filePath)
 	if err != nil {
@@ -112,6 +118,7 @@ func Apply(scope *Scope) {
 					continue
 				}
 			} else if bPrev == 51 && b[0] == 126 { // DELETE
+				line = line[:index-1] + line[index:]
 				if len(line) > 0 && index < len(line) {
 					line = line[:index] + line[index+1:]
 				}
@@ -131,7 +138,6 @@ func Apply(scope *Scope) {
 				index = len(line)
 			}
 		case 27: // ? This happens on key press
-		case 51: // ? This happens on delete
 		case 9: //TAB
 			suggestions := scope.Suggestions(line)
 			maxLength := 0

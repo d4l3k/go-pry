@@ -129,30 +129,38 @@ func InjectPry(filePath string) (string, error) {
 
 // GenerateFile generates and executes a temp file with the given imports
 func GenerateFile(imports []string) error {
-	f, err := ioutil.TempFile("", "pry")
+	dir, err := ioutil.TempDir("", "pry")
 	if err != nil {
 		return err
 	}
-	f.WriteString("package main\nimport (\n\t\"github.com/d4l3k/go-pry/pry\"\n\n")
+	file := "package main\nimport (\n\t\"github.com/d4l3k/go-pry/pry\"\n\n"
 	for _, imp := range imports {
-		f.WriteString(fmt.Sprintf("\t%#v\n", imp))
+		file += fmt.Sprintf("\t%#v\n", imp)
 	}
-	f.WriteString(")\nfunc main() {\n\tpry.Pry()\n}")
-	f.Close()
+	file += ")\nfunc main() {\n\tpry.Pry()\n}"
 
-	oldPath := f.Name()
-	newPath := f.Name() + ".go"
-	os.Rename(oldPath, newPath)
+	newPath := dir + "/main.go"
+	ioutil.WriteFile(newPath, []byte(file), 0644)
 	InjectPry(newPath)
 	ExecuteGoCmd([]string{"run", newPath})
-	RevertPry([]string{newPath})
-	os.Remove(newPath)
+	err = os.RemoveAll(dir)
+	if err != nil {
+		return err
+	}
 	return nil
 }
 
 var debug bool
 
 func main() {
+	// Catch Ctrl-C
+	c := make(chan os.Signal, 1)
+	signal.Notify(c, os.Interrupt)
+	go func() {
+		for range c {
+		}
+	}()
+
 	// FLAGS
 	imports := flag.String("i", "fmt,math", "packages to import, comma seperated")
 	flag.BoolVar(&debug, "d", false, "display debug statements")
@@ -245,13 +253,6 @@ func main() {
 		return
 	}
 
-	c := make(chan os.Signal, 1)
-	signal.Notify(c, os.Interrupt)
-	go func() {
-		for range c {
-		}
-	}()
-
 	ExecuteGoCmd(cmdArgs)
 
 	RevertPry(modifiedFiles)
@@ -312,7 +313,7 @@ func GetExports(pkg *ast.Package) string {
 							}
 					*/
 					case *ast.TypeSpec:
-						out, err := scope.InterpretExpr(stmt.Type)
+						out, err := scope.Interpret(stmt.Type)
 						if err != nil {
 							Debug("ERR %s\n", err.Error())
 							//continue

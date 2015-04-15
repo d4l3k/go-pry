@@ -1,27 +1,39 @@
 package pry
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"go/ast"
 	"go/parser"
+	"go/printer"
 	"go/token"
+	"path/filepath"
 	"reflect"
 	"strconv"
 	"strings"
+
+	"golang.org/x/tools/go/types"
+
+	// Used by types for import determination
+	_ "golang.org/x/tools/go/gcimporter"
 )
 
 // Scope is a string-interface key-value pair that represents variables/functions in scope.
 type Scope struct {
 	Vals   map[string]interface{}
 	Parent *Scope
+	files  []*ast.File
+	config *types.Config
+	path   string
+	line   int
+	fset   *token.FileSet
 }
 
 // NewScope creates a new initialized scope
 func NewScope() *Scope {
 	return &Scope{
-		map[string]interface{}{},
-		nil,
+		Vals: map[string]interface{}{},
 	}
 }
 
@@ -72,18 +84,28 @@ type Func struct {
 func (scope *Scope) InterpretString(exprStr string) (interface{}, error) {
 	exprStr = strings.Trim(exprStr, " \n\t")
 	wrappedExpr := "func(){" + exprStr + "}()"
+	var node ast.Node
 	expr, err := parser.ParseExpr(wrappedExpr)
 	if err != nil && strings.HasPrefix(err.Error(), "1:8: expected statement, found '") {
 		expr, err = parser.ParseExpr(exprStr)
-	}
-	if err != nil {
+		if err != nil {
+			return nil, err
+		}
+		node = expr.(ast.Node)
+	} else if err != nil {
 		return nil, err
+	} else {
+		node = expr.(*ast.CallExpr).Fun.(*ast.FuncLit).Body
 	}
-	return scope.InterpretExpr(expr)
+	errs := scope.CheckStatement(node)
+	if len(errs) > 0 {
+		return nil, errs[0]
+	}
+	return scope.Interpret(node)
 }
 
-// InterpretExpr interprets an ast.Expr and returns the value.
-func (scope *Scope) InterpretExpr(expr ast.Expr) (interface{}, error) {
+// Interpret interprets an ast.Node and returns the value.
+func (scope *Scope) Interpret(expr ast.Node) (interface{}, error) {
 	builtinScope := map[string]interface{}{
 		"nil":    nil,
 		"true":   true,
@@ -111,7 +133,7 @@ func (scope *Scope) InterpretExpr(expr ast.Expr) (interface{}, error) {
 		return obj, nil
 
 	case *ast.SelectorExpr:
-		X, err := scope.InterpretExpr(e.X)
+		X, err := scope.Interpret(e.X)
 		if err != nil {
 			return nil, err
 		}
@@ -143,14 +165,14 @@ func (scope *Scope) InterpretExpr(expr ast.Expr) (interface{}, error) {
 		return nil, fmt.Errorf("unknown field %#v", sel.Name)
 
 	case *ast.CallExpr:
-		fun, err := scope.InterpretExpr(e.Fun)
+		fun, err := scope.Interpret(e.Fun)
 		if err != nil {
 			return nil, err
 		}
 
 		args := make([]reflect.Value, len(e.Args))
 		for i, arg := range e.Args {
-			interpretedArg, err := scope.InterpretExpr(arg)
+			interpretedArg, err := scope.Interpret(arg)
 			if err != nil {
 				return nil, err
 			}
@@ -162,7 +184,7 @@ func (scope *Scope) InterpretExpr(expr ast.Expr) (interface{}, error) {
 			return args[0].Convert(funV).Interface(), nil
 		case *Func:
 			// TODO enforce func return values
-			return InterpretStmt(scope, funV.Def.Body)
+			return scope.Interpret(funV.Def.Body)
 		}
 
 		funVal := reflect.ValueOf(fun)
@@ -191,7 +213,7 @@ func (scope *Scope) InterpretExpr(expr ast.Expr) (interface{}, error) {
 		}
 
 	case *ast.CompositeLit:
-		typ, err := scope.InterpretExpr(e.Type)
+		typ, err := scope.Interpret(e.Type)
 		if err != nil {
 			return nil, err
 		}
@@ -201,7 +223,7 @@ func (scope *Scope) InterpretExpr(expr ast.Expr) (interface{}, error) {
 			l := len(e.Elts)
 			slice := reflect.MakeSlice(typ.(reflect.Type), l, l)
 			for i, elem := range e.Elts {
-				elemValue, err := scope.InterpretExpr(elem)
+				elemValue, err := scope.Interpret(elem)
 				if err != nil {
 					return nil, err
 				}
@@ -214,11 +236,11 @@ func (scope *Scope) InterpretExpr(expr ast.Expr) (interface{}, error) {
 			for _, elem := range e.Elts {
 				switch eT := elem.(type) {
 				case *ast.KeyValueExpr:
-					key, err := scope.InterpretExpr(eT.Key)
+					key, err := scope.Interpret(eT.Key)
 					if err != nil {
 						return nil, err
 					}
-					val, err := scope.InterpretExpr(eT.Value)
+					val, err := scope.Interpret(eT.Value)
 					if err != nil {
 						return nil, err
 					}
@@ -235,25 +257,25 @@ func (scope *Scope) InterpretExpr(expr ast.Expr) (interface{}, error) {
 		}
 
 	case *ast.BinaryExpr:
-		x, err := scope.InterpretExpr(e.X)
+		x, err := scope.Interpret(e.X)
 		if err != nil {
 			return nil, err
 		}
-		y, err := scope.InterpretExpr(e.Y)
+		y, err := scope.Interpret(e.Y)
 		if err != nil {
 			return nil, err
 		}
 		return ComputeBinaryOp(x, y, e.Op)
 
 	case *ast.UnaryExpr:
-		x, err := scope.InterpretExpr(e.X)
+		x, err := scope.Interpret(e.X)
 		if err != nil {
 			return nil, err
 		}
 		return ComputeUnaryOp(x, e.Op)
 
 	case *ast.ArrayType:
-		typ, err := scope.InterpretExpr(e.Elt)
+		typ, err := scope.Interpret(e.Elt)
 		if err != nil {
 			return nil, err
 		}
@@ -261,11 +283,11 @@ func (scope *Scope) InterpretExpr(expr ast.Expr) (interface{}, error) {
 		return arrType, nil
 
 	case *ast.MapType:
-		keyType, err := scope.InterpretExpr(e.Key)
+		keyType, err := scope.Interpret(e.Key)
 		if err != nil {
 			return nil, err
 		}
-		valType, err := scope.InterpretExpr(e.Value)
+		valType, err := scope.Interpret(e.Value)
 		if err != nil {
 			return nil, err
 		}
@@ -273,7 +295,7 @@ func (scope *Scope) InterpretExpr(expr ast.Expr) (interface{}, error) {
 		return mapType, nil
 
 	case *ast.ChanType:
-		typeI, err := scope.InterpretExpr(e.Value)
+		typeI, err := scope.Interpret(e.Value)
 		if err != nil {
 			return nil, err
 		}
@@ -284,11 +306,11 @@ func (scope *Scope) InterpretExpr(expr ast.Expr) (interface{}, error) {
 		return reflect.ChanOf(reflect.BothDir, typ), nil
 
 	case *ast.IndexExpr:
-		X, err := scope.InterpretExpr(e.X)
+		X, err := scope.Interpret(e.X)
 		if err != nil {
 			return nil, err
 		}
-		i, err := scope.InterpretExpr(e.Index)
+		i, err := scope.Interpret(e.Index)
 		if err != nil {
 			return nil, err
 		}
@@ -311,15 +333,15 @@ func (scope *Scope) InterpretExpr(expr ast.Expr) (interface{}, error) {
 		}
 		return xVal.Index(iVal).Interface(), nil
 	case *ast.SliceExpr:
-		low, err := scope.InterpretExpr(e.Low)
+		low, err := scope.Interpret(e.Low)
 		if err != nil {
 			return nil, err
 		}
-		high, err := scope.InterpretExpr(e.High)
+		high, err := scope.Interpret(e.High)
 		if err != nil {
 			return nil, err
 		}
-		X, err := scope.InterpretExpr(e.X)
+		X, err := scope.Interpret(e.X)
 		if err != nil {
 			return nil, err
 		}
@@ -341,23 +363,14 @@ func (scope *Scope) InterpretExpr(expr ast.Expr) (interface{}, error) {
 		return xVal.Slice(lowVal, highVal).Interface(), nil
 
 	case *ast.ParenExpr:
-		return scope.InterpretExpr(e.X)
+		return scope.Interpret(e.X)
 
 	case *ast.FuncLit:
 		return &Func{e}, nil
-
-	default:
-		return nil, fmt.Errorf("unknown EXPR %T", e)
-	}
-}
-
-// InterpretStmt interprets an ast.Stmt and returns the value.
-func InterpretStmt(scope *Scope, stmt ast.Stmt) (interface{}, error) {
-	switch s := stmt.(type) {
 	case *ast.BlockStmt:
 		var outFinal interface{}
-		for _, stmts := range s.List {
-			out, err := InterpretStmt(scope, stmts)
+		for _, stmts := range e.List {
+			out, err := scope.Interpret(stmts)
 			if err != nil {
 				return out, err
 			}
@@ -366,9 +379,9 @@ func InterpretStmt(scope *Scope, stmt ast.Stmt) (interface{}, error) {
 		return outFinal, nil
 
 	case *ast.ReturnStmt:
-		results := make([]interface{}, len(s.Results))
-		for i, result := range s.Results {
-			out, err := scope.InterpretExpr(result)
+		results := make([]interface{}, len(e.Results))
+		for i, result := range e.Results {
+			out, err := scope.Interpret(result)
 			if err != nil {
 				return out, err
 			}
@@ -384,18 +397,18 @@ func InterpretStmt(scope *Scope, stmt ast.Stmt) (interface{}, error) {
 
 	case *ast.AssignStmt:
 		// TODO implement type checking
-		define := s.Tok == token.DEFINE
-		lhs := make([]string, len(s.Lhs))
-		for i, id := range s.Lhs {
+		define := e.Tok == token.DEFINE
+		lhs := make([]string, len(e.Lhs))
+		for i, id := range e.Lhs {
 			lhsIdent, isIdent := id.(*ast.Ident)
 			if !isIdent {
 				return nil, fmt.Errorf("%#v assignment is not ident", id)
 			}
 			lhs[i] = lhsIdent.Name
 		}
-		rhs := make([]interface{}, len(s.Rhs))
-		for i, expr := range s.Rhs {
-			val, err := scope.InterpretExpr(expr)
+		rhs := make([]interface{}, len(e.Rhs))
+		for i, expr := range e.Rhs {
+			val, err := scope.Interpret(expr)
 			if err != nil {
 				return nil, err
 			}
@@ -434,10 +447,130 @@ func InterpretStmt(scope *Scope, stmt ast.Stmt) (interface{}, error) {
 		return rhs[0], nil
 
 	case *ast.ExprStmt:
-		return scope.InterpretExpr(s.X)
+		return scope.Interpret(e.X)
 	default:
-		return nil, fmt.Errorf("unknown STMT %#v", s)
+		return nil, fmt.Errorf("unknown node %#v", e)
 	}
+}
+
+// ConfigureTypes configures the scope type checker
+func (scope *Scope) ConfigureTypes(path string, line int) error {
+	scope.path = path
+	scope.line = line
+	scope.fset = token.NewFileSet() // positions are relative to fset
+	scope.config = &types.Config{FakeImportC: true}
+
+	// Parse the file containing this very example
+	// but stop after processing the imports.
+	f, err := parser.ParseDir(scope.fset, filepath.Dir(scope.path), nil, 0)
+	if err != nil {
+		return err
+	}
+
+	for _, pkg := range f {
+		for _, file := range pkg.Files {
+			scope.files = append(scope.files, file)
+		}
+	}
+
+	_, errs := scope.TypeCheck()
+	if len(errs) > 0 {
+		return errs[0]
+	}
+
+	return nil
+}
+
+// walker adapts a function to satisfy the ast.Visitor interface.
+// The function return whether the walk should proceed into the node's children.
+type walker func(ast.Node) bool
+
+func (w walker) Visit(node ast.Node) ast.Visitor {
+	if w(node) {
+		return w
+	}
+	return nil
+}
+
+// CheckStatement checks if a statement is type safe
+func (scope *Scope) CheckStatement(node ast.Node) (errs []error) {
+	for _, file := range scope.files {
+		name := "." + scope.Render(file.Name) + ".gopry"
+		if name == filepath.Base(scope.path) {
+			ast.Walk(walker(func(n ast.Node) bool {
+				switch s := n.(type) {
+				case *ast.BlockStmt:
+					for i, stmt := range s.List {
+						pos := scope.fset.Position(stmt.Pos())
+						if pos.Line == scope.line {
+							r := scope.Render(stmt)
+							if strings.HasPrefix(r, "pry.Apply") {
+								var iStmt []ast.Stmt
+								switch s2 := node.(type) {
+								case *ast.BlockStmt:
+									iStmt = append(iStmt, s2.List...)
+								case ast.Stmt:
+									iStmt = append(iStmt, s2)
+								case ast.Expr:
+									iStmt = append(iStmt, ast.Stmt(&ast.ExprStmt{X: s2}))
+								default:
+									errs = append(errs, errors.New("not a statement"))
+									return false
+								}
+								oldList := s.List
+
+								for _, is := range iStmt {
+									s.List = append(s.List, is)
+								}
+								copy(s.List[i+len(iStmt):], s.List[i:])
+								for j, is := range iStmt {
+									s.List[i+j] = is
+								}
+
+								fmt.Println(scope.Render(s))
+
+								_, errs = scope.TypeCheck()
+								if len(errs) > 0 {
+									s.List = oldList
+									return false
+								}
+								return false
+							}
+						}
+					}
+				}
+				return true
+			}), file)
+		}
+	}
+	return
+}
+
+// Render renders an ast node
+func (scope *Scope) Render(x ast.Node) string {
+	var buf bytes.Buffer
+	if err := printer.Fprint(&buf, scope.fset, x); err != nil {
+		panic(err)
+	}
+	return buf.String()
+}
+
+// TypeCheck does type checking and returns the info object
+func (scope *Scope) TypeCheck() (*types.Info, []error) {
+	var errors []error
+	scope.config.Error = func(err error) {
+		fmt.Println("ERR", err)
+		if !strings.HasSuffix(err.Error(), "not used") {
+			errors = append(errors, err)
+		}
+	}
+	info := &types.Info{}
+	_, err := scope.config.Check(filepath.Dir(scope.path), scope.fset, scope.files, info)
+	if err != nil {
+		fmt.Println("ERR2", err)
+		//errors = append(errors, err)
+	}
+	return info, errors
 }
 
 // StringToType returns the reflect.Type corresponding to the type string provided. Ex: StringToType("int")
