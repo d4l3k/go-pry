@@ -49,19 +49,19 @@ func Apply(scope *Scope) {
 	if end > len(lines) {
 		end = len(lines)
 	}
-	maxLength := len(fmt.Sprint(end))
+	maxLen := len(fmt.Sprint(end))
 	for i := start; i < end; i++ {
 		caret := "  "
 		if i == lineNum {
 			caret = "=>"
 		}
 		numStr := fmt.Sprint(i + 1)
-		if len(numStr) < maxLength {
+		if len(numStr) < maxLen {
 			numStr = " " + numStr
 		}
 		num := ansi.Color(numStr, "blue+b")
-		line := strings.Replace(lines[i], "\t", "  ", -1)
-		fmt.Printf(" %s %s: %s\n", caret, num, Highlight(line))
+		highlightedLine := Highlight(strings.Replace(lines[i], "\t", "  ", -1))
+		fmt.Printf(" %s %s: %s\n", caret, num, highlightedLine)
 	}
 	fmt.Println()
 
@@ -154,7 +154,6 @@ func Apply(scope *Scope) {
 				fmt.Printf("\033[1A%s\033[%dD", ansi.Color(paddedTerm, "white+b:magenta"), len(paddedTerm))
 			}
 			fmt.Printf("\033[%dB", len(suggestions))
-			//fmt.Println(strings.Join(suggestions, " "))
 		case 10: //ENTER
 			fmt.Println()
 			if len(line) == 0 {

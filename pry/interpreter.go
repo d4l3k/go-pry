@@ -517,17 +517,13 @@ func (scope *Scope) CheckStatement(node ast.Node) (errs []error) {
 									errs = append(errs, errors.New("not a statement"))
 									return false
 								}
-								oldList := s.List
+								oldList := make([]ast.Stmt, len(s.List))
+								copy(oldList, s.List)
 
-								for _, is := range iStmt {
-									s.List = append(s.List, is)
-								}
+								s.List = append(s.List, make([]ast.Stmt, len(iStmt))...)
+
 								copy(s.List[i+len(iStmt):], s.List[i:])
-								for j, is := range iStmt {
-									s.List[i+j] = is
-								}
-
-								fmt.Println(scope.Render(s))
+								copy(s.List[i:], iStmt)
 
 								_, errs = scope.TypeCheck()
 								if len(errs) > 0 {
@@ -570,7 +566,7 @@ func (scope *Scope) TypeCheck() (*types.Info, []error) {
 
 // StringToType returns the reflect.Type corresponding to the type string provided. Ex: StringToType("int")
 func StringToType(str string) (reflect.Type, error) {
-	types := map[string]reflect.Type{
+	builtinTypes := map[string]reflect.Type{
 		"bool":       reflect.TypeOf(true),
 		"byte":       reflect.TypeOf(byte(0)),
 		"rune":       reflect.TypeOf(rune(0)),
@@ -592,7 +588,7 @@ func StringToType(str string) (reflect.Type, error) {
 		"complex128": reflect.TypeOf(complex128(0)),
 		"error":      reflect.TypeOf(errors.New("")),
 	}
-	val, present := types[str]
+	val, present := builtinTypes[str]
 	if !present {
 		return nil, fmt.Errorf("type %#v is not in table", str)
 	}
