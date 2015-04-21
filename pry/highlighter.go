@@ -43,7 +43,7 @@ func Highlight(s string) string {
 		"uint9",
 		"uintptr",
 	}
-	s = highlightWords(s, []string{"-?\\d+((\\.|e-?)\\d+)*", "nil", "true", "false"}, highlightColor4, "\\W")
+	s = highlightWords(s, []string{"-?(0[xX])?\\d+((\\.|e-?)\\d+)*", "nil", "true", "false"}, highlightColor4, "\\W")
 	s = highlightWords(s, highlightKeywords, highlightColor1, "\\W")
 	s = highlightWords(s, highlightKeywordsSpaced, highlightColor1, "\\s")
 	s = highlightWords(s, highlightTypes, highlightColor2, "\\W")
