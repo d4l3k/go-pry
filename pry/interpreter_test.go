@@ -26,6 +26,28 @@ func TestIntLiteral(t *testing.T) {
 		t.Error("Expected -1234")
 	}
 }
+func TestHexIntLiteral(t *testing.T) {
+	scope := NewScope()
+	out, err := scope.InterpretString("0xC123")
+	if err != nil {
+		t.Error(err)
+	}
+	expected := 0xC123
+	if !reflect.DeepEqual(expected, out) {
+		t.Errorf("Expected %#v got %#v.", expected, out)
+	}
+}
+func TestOctalIntLiteral(t *testing.T) {
+	scope := NewScope()
+	out, err := scope.InterpretString("03272")
+	if err != nil {
+		t.Error(err)
+	}
+	expected := 03272
+	if !reflect.DeepEqual(expected, out) {
+		t.Errorf("Expected %#v got %#v.", expected, out)
+	}
+}
 func TestCharLiteral(t *testing.T) {
 	scope := NewScope()
 	out, err := scope.InterpretString("'a'")

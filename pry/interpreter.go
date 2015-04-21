@@ -201,7 +201,8 @@ func (scope *Scope) Interpret(expr ast.Node) (interface{}, error) {
 	case *ast.BasicLit:
 		switch e.Kind {
 		case token.INT:
-			return strconv.Atoi(e.Value)
+			n, err := strconv.ParseInt(e.Value, 0, 64)
+			return int(n), err
 		case token.FLOAT, token.IMAG:
 			return strconv.ParseFloat(e.Value, 64)
 		case token.CHAR:
