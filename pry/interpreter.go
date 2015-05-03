@@ -80,26 +80,35 @@ type Func struct {
 	Def *ast.FuncLit
 }
 
-// InterpretString interprets a string of go code and returns the result.
-func (scope *Scope) InterpretString(exprStr string) (interface{}, error) {
+// ParseString parses go code into the ast nodes.
+func (scope *Scope) ParseString(exprStr string) (ast.Node, int, error) {
 	exprStr = strings.Trim(exprStr, " \n\t")
 	wrappedExpr := "func(){" + exprStr + "}()"
-	var node ast.Node
+	shifted := 7
 	expr, err := parser.ParseExpr(wrappedExpr)
 	if err != nil && strings.HasPrefix(err.Error(), "1:8: expected statement, found '") {
 		expr, err = parser.ParseExpr(exprStr)
+		shifted = 0
 		if err != nil {
-			return nil, err
+			return expr, shifted, err
 		}
-		node = expr.(ast.Node)
+		return expr.(ast.Node), shifted, nil
 	} else if err != nil {
-		return nil, err
+		return expr, shifted, err
 	} else {
-		node = expr.(*ast.CallExpr).Fun.(*ast.FuncLit).Body
+		return expr.(*ast.CallExpr).Fun.(*ast.FuncLit).Body, shifted, nil
+	}
+}
+
+// InterpretString interprets a string of go code and returns the result.
+func (scope *Scope) InterpretString(exprStr string) (interface{}, error) {
+	node, _, err := scope.ParseString(exprStr)
+	if err != nil {
+		return node, err
 	}
 	errs := scope.CheckStatement(node)
 	if len(errs) > 0 {
-		return nil, errs[0]
+		return node, errs[0]
 	}
 	return scope.Interpret(node)
 }

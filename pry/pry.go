@@ -139,7 +139,7 @@ func Apply(scope *Scope) {
 			}
 		case 27: // ? This happens on key press
 		case 9: //TAB
-			suggestions := scope.Suggestions(line)
+			suggestions := scope.Suggestions(line) //, index)
 			maxLength := 0
 			for _, term := range suggestions {
 				if len(term) > maxLength {
@@ -164,7 +164,7 @@ func Apply(scope *Scope) {
 			}
 			resp, err := scope.InterpretString(line)
 			if err != nil {
-				fmt.Println("Error: ", err)
+				fmt.Println("Error: ", err, resp)
 			} else {
 				respStr := Highlight(fmt.Sprintf("%#v", resp))
 				fmt.Printf("=> %s\n", respStr)

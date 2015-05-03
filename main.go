@@ -105,9 +105,9 @@ func InjectPry(filePath string) (string, error) {
 	Debug(" :: Found %d pry statements.\n", len(contexts))
 
 	for _, context := range contexts {
-		vars := filterVars(context.Vars)
+		filteredVars := filterVars(context.Vars)
 		obj := "&pry.Scope{Vals:map[string]interface{}{ "
-		for _, v := range vars {
+		for _, v := range filteredVars {
 			obj += "\"" + v + "\": " + v + ", "
 		}
 		obj += strings.Join(packagePairs, "")
@@ -165,7 +165,6 @@ func main() {
 	imports := flag.String("i", "fmt,math", "packages to import, comma seperated")
 	flag.BoolVar(&debug, "d", false, "display debug statements")
 
-	cmdArgs := flag.Args()
 	flag.CommandLine.Usage = func() {
 		ExecuteGoCmd([]string{})
 		fmt.Println("----")
@@ -177,6 +176,7 @@ func main() {
 		return
 	}
 	flag.Parse()
+	cmdArgs := flag.Args()
 	if len(cmdArgs) == 0 {
 		err := GenerateFile(strings.Split(*imports, ","))
 		if err != nil {
