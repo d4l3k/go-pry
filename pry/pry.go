@@ -10,6 +10,8 @@ import (
 	"runtime"
 	"strings"
 
+	"go/ast"
+
 	"github.com/mgutz/ansi"
 )
 
@@ -19,6 +21,9 @@ func Pry(v ...interface{}) {
 
 // Apply drops into a pry shell in the location required.
 func Apply(scope *Scope) {
+	if scope.Files == nil {
+		scope.Files = map[string]*ast.File{}
+	}
 	// disable input buffering
 	exec.Command("stty", "-F", "/dev/tty", "cbreak", "min", "1").Run()
 	// do not display entered characters on the screen
@@ -139,7 +144,7 @@ func Apply(scope *Scope) {
 			}
 		case 27: // ? This happens on key press
 		case 9: //TAB
-			suggestions := scope.Suggestions(line) //, index)
+			suggestions := scope.SuggestionsGoCode(line, index)
 			maxLength := 0
 			for _, term := range suggestions {
 				if len(term) > maxLength {

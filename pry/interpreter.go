@@ -23,7 +23,7 @@ import (
 type Scope struct {
 	Vals   map[string]interface{}
 	Parent *Scope
-	files  []*ast.File
+	Files  map[string]*ast.File
 	config *types.Config
 	path   string
 	line   int
@@ -33,7 +33,8 @@ type Scope struct {
 // NewScope creates a new initialized scope
 func NewScope() *Scope {
 	return &Scope{
-		Vals: map[string]interface{}{},
+		Vals:  map[string]interface{}{},
+		Files: map[string]*ast.File{},
 	}
 }
 
@@ -478,8 +479,8 @@ func (scope *Scope) ConfigureTypes(path string, line int) error {
 	}
 
 	for _, pkg := range f {
-		for _, file := range pkg.Files {
-			scope.files = append(scope.files, file)
+		for name, file := range pkg.Files {
+			scope.Files[name] = file
 		}
 	}
 
@@ -504,9 +505,9 @@ func (w walker) Visit(node ast.Node) ast.Visitor {
 
 // CheckStatement checks if a statement is type safe
 func (scope *Scope) CheckStatement(node ast.Node) (errs []error) {
-	for _, file := range scope.files {
-		name := "." + scope.Render(file.Name) + ".gopry"
-		if name == filepath.Base(scope.path) {
+	for name, file := range scope.Files {
+		name = filepath.Dir(name) + "/." + filepath.Base(name) + "pry"
+		if name == scope.path {
 			ast.Walk(walker(func(n ast.Node) bool {
 				switch s := n.(type) {
 				case *ast.BlockStmt:
@@ -570,7 +571,11 @@ func (scope *Scope) TypeCheck() (*types.Info, []error) {
 		}
 	}
 	info := &types.Info{}
-	scope.config.Check(filepath.Dir(scope.path), scope.fset, scope.files, info)
+	var files []*ast.File
+	for _, f := range scope.Files {
+		files = append(files, f)
+	}
+	scope.config.Check(filepath.Dir(scope.path), scope.fset, files, info)
 	return info, errs
 }
 
