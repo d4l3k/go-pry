@@ -8,6 +8,7 @@ import (
 	"go/parser"
 	"go/token"
 	"io/ioutil"
+	"log"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -58,13 +59,14 @@ func InjectPry(filePath string) (string, error) {
 			if err != nil {
 				panic(err)
 			}
-			pkgAst, err := parser.ParseDir(fset, pkg.Dir, nil, 0)
+			pkgAst, err := parser.ParseDir(fset, pkg.Dir, nil, parser.ParseComments)
 			if err != nil {
 				panic(err)
 			}
 			pair := "\"" + pkg.Name + "\": pry.Package{Name: \"" + pkg.Name + "\", Functions: map[string]interface{}{"
+			added := make(map[string]bool)
 			for _, nPkg := range pkgAst {
-				pair += GetExports(nPkg)
+				pair += GetExports(nPkg, added)
 			}
 			pair += "}}, "
 			packagePairs = append(packagePairs, pair)
@@ -163,6 +165,7 @@ func main() {
 
 	// FLAGS
 	imports := flag.String("i", "fmt,math", "packages to import, comma seperated")
+	revert := flag.Bool("r", true, "whether to revert changes on exit")
 	flag.BoolVar(&debug, "d", false, "display debug statements")
 
 	flag.CommandLine.Usage = func() {
@@ -255,7 +258,9 @@ func main() {
 
 	ExecuteGoCmd(cmdArgs)
 
-	RevertPry(modifiedFiles)
+	if *revert {
+		RevertPry(modifiedFiles)
+	}
 }
 
 // RevertPry reverts the changes made by InjectPry.
@@ -280,65 +285,71 @@ func RevertPry(modifiedFiles []string) {
 }
 
 // Debug prints debug statements if debug is true.
-func Debug(k ...interface{}) {
+func Debug(templ string, k ...interface{}) {
 	if debug {
-		fmt.Println(k...)
+		log.Printf(templ, k...)
 	}
 }
 
 // GetExports returns a string of gocode that represents the exports (constants/functions) of an ast.Package.
-func GetExports(pkg *ast.Package) string {
+func GetExports(pkg *ast.Package, added map[string]bool) string {
 	vars := ""
 	for name, file := range pkg.Files {
-		if !strings.HasSuffix(name, "_test.go") {
-			// Print the imports from the file's AST.
-			scope := pry.NewScope()
-			for k, obj := range file.Scope.Objects {
-				firstLetter := k[0:1]
-				if firstLetter == strings.ToUpper(firstLetter) && firstLetter != "_" {
+		if strings.HasSuffix(name, "_test.go") {
+			continue
+		}
 
-					isType := false
+		// Print the imports from the file's AST.
+		scope := pry.NewScope()
+		for k, obj := range file.Scope.Objects {
+			if added[k] {
+				continue
+			}
+			added[k] = true
+			firstLetter := k[0:1]
+			if firstLetter == strings.ToUpper(firstLetter) && firstLetter != "_" {
 
-					switch stmt := obj.Decl.(type) {
-					/*
-						case *ast.ValueSpec:
-							if len(stmt.Values) > 0 {
-								out, err := pry.InterpretExpr(scope, stmt.Values[0])
-								if err != nil {
-									fmt.Println("ERR", err)
-									//continue
-								} else {
-									scope[obj.Name] = out
-								}
+				isType := false
+
+				switch stmt := obj.Decl.(type) {
+				/*
+					case *ast.ValueSpec:
+						if len(stmt.Values) > 0 {
+							out, err := pry.InterpretExpr(scope, stmt.Values[0])
+							if err != nil {
+								fmt.Println("ERR", err)
+								//continue
+							} else {
+								scope[obj.Name] = out
 							}
-					*/
-					case *ast.TypeSpec:
-						out, err := scope.Interpret(stmt.Type)
-						if err != nil {
-							Debug("ERR %s\n", err.Error())
-							//continue
-						} else {
-							scope.Set(obj.Name, out)
-							isType = true
 						}
+				*/
+				case *ast.TypeSpec:
+					out, err := scope.Interpret(stmt.Type)
+					if err != nil {
+						Debug("ERR %s\n", err.Error())
+						//continue
+					} else {
+						scope.Set(obj.Name, out)
+						isType = true
 					}
+				}
 
-					if obj.Kind != ast.Typ || isType {
-						path := pkg.Name + "." + k
-						vars += "\"" + k + "\": "
-						if isType {
-							out, _ := scope.Get(obj.Name)
-							zero := reflect.Zero(out.(reflect.Type)).Interface()
-							vars += fmt.Sprintf("pry.Type(%s(%#v))", path, zero)
+				if obj.Kind != ast.Typ || isType {
+					path := pkg.Name + "." + k
+					vars += "\"" + k + "\": "
+					if isType {
+						out, _ := scope.Get(obj.Name)
+						zero := reflect.Zero(out.(reflect.Type)).Interface()
+						vars += fmt.Sprintf("pry.Type(%s(%#v))", path, zero)
 
-						} else if path == "math.MaxUint64" {
-							// TODO Fix hack for Uint64
-							vars += "uint64(math.MaxUint64)"
-						} else {
-							vars += path
-						}
-						vars += ","
+					} else if path == "math.MaxUint64" {
+						// TODO Fix hack for Uint64
+						vars += "uint64(math.MaxUint64)"
+					} else {
+						vars += path
 					}
+					vars += ","
 				}
 			}
 		}
