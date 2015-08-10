@@ -111,13 +111,12 @@ func (scope *Scope) SuggestionsWIP(query string, index int) []string {
 const placeholder = "pryPlaceholderAutoComplete"
 
 // SuggestionsGoCode is a suggestion engine that uses gocode for autocomplete.
-func (scope *Scope) SuggestionsGoCode(line string, index int) []string {
+func (scope *Scope) SuggestionsGoCode(line string, index int) ([]string, error) {
 	var suggestions []string
 	var code string
 	for name, file := range scope.Files {
 		name = filepath.Dir(name) + "/." + filepath.Base(name) + "pry"
 		if name == scope.path {
-
 			ast.Walk(walker(func(n ast.Node) bool {
 				switch s := n.(type) {
 				case *ast.BlockStmt:
@@ -145,29 +144,27 @@ func (scope *Scope) SuggestionsGoCode(line string, index int) []string {
 				}
 				return true
 			}), file)
+
 			i := strings.Index(code, placeholder) + index
 			code = strings.Replace(code, placeholder, line, 1)
-			//fmt.Println("COMPLETION", i, code)
 
 			subProcess := exec.Command("gocode", "autocomplete", filepath.Dir(name), strconv.Itoa(i))
 
 			stdin, err := subProcess.StdinPipe()
 			if err != nil {
-				fmt.Println(err)
-				break
+				return nil, err
 			}
 
 			stdout, err := subProcess.StdoutPipe()
 			if err != nil {
-				fmt.Println(err)
-				break
+				return nil, err
 			}
 			defer stdout.Close()
 
 			subProcess.Stderr = os.Stderr
 
 			if err = subProcess.Start(); err != nil {
-				fmt.Println("An error occured: ", err) //replace with logger, or anything you want
+				return nil, err
 			}
 
 			io.WriteString(stdin, code)
@@ -175,16 +172,21 @@ func (scope *Scope) SuggestionsGoCode(line string, index int) []string {
 
 			output, err := ioutil.ReadAll(bufio.NewReader(stdout))
 			if err != nil {
-				fmt.Println(err)
-				break
+				return nil, err
 			}
-			suggestions = strings.Split(string(output), "\n")[1:]
+			rawSuggestions := strings.Split(string(output), "\n")[1:]
+			for _, suggestion := range rawSuggestions {
+				trimmed := strings.TrimSpace(suggestion)
+				if len(trimmed) > 0 {
+					suggestions = append(suggestions, trimmed)
+				}
+			}
 			subProcess.Wait()
 
 			break
 		}
 	}
-	return suggestions
+	return suggestions, nil
 }
 
 func (scope *Scope) getType(idents []*ast.Ident) interface{} {

@@ -78,7 +78,40 @@ func Apply(scope *Scope) {
 	index := 0
 	b := make([]byte, 1)
 	for {
-		fmt.Printf("\r\033[K[%d] go-pry> %s \033[%dD", currentPos, Highlight(line), len(line)-index+1)
+		prompt := fmt.Sprintf("[%d] go-pry> ", currentPos)
+		fmt.Printf("\r\033[K%s%s \033[0J\033[%dD", prompt, Highlight(line), len(line)-index+1)
+		promptWidth := len(prompt) + index
+
+		// Suggestions
+		// TODO(d4l3k): Refactor out
+		suggestions, err := scope.SuggestionsGoCode(line, index)
+		if err != nil {
+			suggestions = []string{"ERR", err.Error()}
+		}
+		maxLength := 0
+		if len(suggestions) > 10 {
+			suggestions = suggestions[:10]
+		}
+		for _, term := range suggestions {
+			if len(term) > maxLength {
+				maxLength = len(term)
+			}
+		}
+		for _, term := range suggestions {
+			paddedTerm := term
+			for len(paddedTerm) < maxLength {
+				paddedTerm += " "
+			}
+			leftPadding := ""
+			for i := 0; i < promptWidth; i++ {
+				leftPadding += " "
+			}
+			fmt.Printf("\n%s%s\033[%dD", leftPadding, ansi.Color(paddedTerm, "white+b:magenta"), len(paddedTerm))
+		}
+		if len(suggestions) > 0 {
+			fmt.Printf("\033[%dA", len(suggestions))
+		}
+
 		bPrev := b[0]
 		os.Stdin.Read(b)
 		switch b[0] {
@@ -144,21 +177,6 @@ func Apply(scope *Scope) {
 			}
 		case 27: // ? This happens on key press
 		case 9: //TAB
-			suggestions := scope.SuggestionsGoCode(line, index)
-			maxLength := 0
-			for _, term := range suggestions {
-				if len(term) > maxLength {
-					maxLength = len(term)
-				}
-			}
-			for _, term := range suggestions {
-				paddedTerm := term
-				for len(paddedTerm) < maxLength {
-					paddedTerm += " "
-				}
-				fmt.Printf("\033[1A%s\033[%dD", ansi.Color(paddedTerm, "white+b:magenta"), len(paddedTerm))
-			}
-			fmt.Printf("\033[%dB", len(suggestions))
 		case 10: //ENTER
 			fmt.Println()
 			if len(line) == 0 {
@@ -172,7 +190,7 @@ func Apply(scope *Scope) {
 				fmt.Println("Error: ", err, resp)
 			} else {
 				respStr := Highlight(fmt.Sprintf("%#v", resp))
-				fmt.Printf("=> %s\n", respStr)
+				fmt.Printf("=> %s\033[0J\n", respStr)
 			}
 			history = append(history, line)
 			count++
