@@ -29,6 +29,7 @@ func main() {
 	a := 1
 	b := Banana{"Jeoffry", []int{1, 2, 3}}
 	m := []int{1234}
+	_ = m
 
 	testMake := make(chan int, 1)
 	testMap := map[int]interface{}{
@@ -38,6 +39,7 @@ func main() {
 			1, "asdf",
 		},
 	}
+	_ = testMap
 	go func() {
 		_ = 1 + 1*1/1%1
 	}()

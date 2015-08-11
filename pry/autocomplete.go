@@ -2,111 +2,15 @@ package pry
 
 import (
 	"bufio"
-	"fmt"
 	"go/ast"
 	"io"
 	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
-	"reflect"
-	"sort"
 	"strconv"
 	"strings"
 )
-
-// Suggestions returns auto complete suggestions for the query.
-func (scope *Scope) Suggestions(query string) []string {
-	terms := []string{}
-	if len(query) == 0 {
-		terms = append(terms, scope.Keys()...)
-	} else if query[len(query)-1] == '.' {
-		val, present := scope.Get(query[:len(query)-1])
-		if present {
-			pkg, isPackage := val.(Package)
-			if isPackage {
-				val = pkg.Functions
-				for k, v := range pkg.Functions {
-					if reflect.TypeOf(v).Kind() == reflect.Func {
-						k += "("
-					}
-					terms = append(terms, k)
-				}
-			}
-			typeOf := reflect.TypeOf(val)
-			methods := make([]string, typeOf.NumMethod())
-			for i := range methods {
-				methods[i] = typeOf.Method(i).Name + "("
-			}
-			terms = append(terms, methods...)
-
-			if typeOf.Kind() == reflect.Struct {
-				fields := make([]string, typeOf.NumField())
-				for i := range fields {
-					fields[i] = typeOf.Field(i).Name
-				}
-				terms = append(terms, fields...)
-			}
-		}
-	}
-	sort.Sort(sort.StringSlice(terms))
-	return terms
-}
-
-// SuggestionsWIP is a WIP intelligent suggestion provider.
-func (scope *Scope) SuggestionsWIP(query string, index int) []string {
-	query = strings.Trim(query, " \n\t")
-
-	terms := []string{}
-	if len(query) == 0 {
-		terms = append(terms, scope.Keys()...)
-	}
-	node, shifted, err := scope.ParseString(query)
-	if err != nil {
-		return terms
-	}
-
-	index += shifted + 1
-
-	fmt.Println()
-
-	var final ast.Node
-	var idents []*ast.Ident
-
-	ast.Walk(walker(func(n ast.Node) bool {
-		if n == nil {
-			return true
-		}
-		start := int(n.Pos())
-		end := int(n.End())
-		if start < index && end >= index {
-			expr, ok := n.(*ast.ExprStmt)
-			if ok {
-				ast.Walk(walker(func(n2 ast.Node) bool {
-					ident, ok2 := n2.(*ast.Ident)
-					if ok2 {
-						idents = append(idents, ident)
-					}
-					return true
-				}), expr)
-			}
-			final = n
-		}
-		return true
-	}), node)
-
-	fmt.Printf("F: %#v I: %#v\n", final, idents)
-
-	_, isIdent := final.(*ast.Ident)
-	if isIdent {
-		typ := scope.getType(idents)
-		_ = typ
-	}
-
-	_ = node
-
-	return terms
-}
 
 const placeholder = "pryPlaceholderAutoComplete"
 
@@ -187,19 +91,4 @@ func (scope *Scope) SuggestionsGoCode(line string, index int) ([]string, error) 
 		}
 	}
 	return suggestions, nil
-}
-
-func (scope *Scope) getType(idents []*ast.Ident) interface{} {
-	var item interface{}
-	for _, ident := range idents {
-		if item == nil {
-			val, exists := scope.Get(ident.Name)
-			if exists {
-				item = val
-			} else {
-				return nil
-			}
-		}
-	}
-	return item
 }
