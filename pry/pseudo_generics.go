@@ -12,6 +12,13 @@ func ComputeBinaryOp(xI, yI interface{}, op token.Token) (interface{}, error) {
 	typeY := reflect.TypeOf(yI)
 	if typeX == typeY {
 		switch xI.(type) {
+		case string:
+			x := xI.(string)
+			y := yI.(string)
+			switch op {
+			case token.ADD:
+				return x + y, nil
+			}
 		case int:
 			x := xI.(int)
 			y := yI.(int)

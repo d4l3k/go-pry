@@ -9,6 +9,7 @@ go-pry - an interactive REPL for Go that allows you to drop into your code at an
 
 Example
 
+![go-pry Animated Example](https://i.imgur.com/H8hFzPV.gif)
 ![go-pry Example](https://i.imgur.com/0rmwVY7.png)
 
 

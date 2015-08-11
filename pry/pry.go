@@ -6,7 +6,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"reflect"
 	"runtime"
 	"strings"
 
@@ -80,37 +79,9 @@ func Apply(scope *Scope) {
 	for {
 		prompt := fmt.Sprintf("[%d] go-pry> ", currentPos)
 		fmt.Printf("\r\033[K%s%s \033[0J\033[%dD", prompt, Highlight(line), len(line)-index+1)
-		promptWidth := len(prompt) + index
 
-		// Suggestions
-		// TODO(d4l3k): Refactor out
-		suggestions, err := scope.SuggestionsGoCode(line, index)
-		if err != nil {
-			suggestions = []string{"ERR", err.Error()}
-		}
-		maxLength := 0
-		if len(suggestions) > 10 {
-			suggestions = suggestions[:10]
-		}
-		for _, term := range suggestions {
-			if len(term) > maxLength {
-				maxLength = len(term)
-			}
-		}
-		for _, term := range suggestions {
-			paddedTerm := term
-			for len(paddedTerm) < maxLength {
-				paddedTerm += " "
-			}
-			leftPadding := ""
-			for i := 0; i < promptWidth; i++ {
-				leftPadding += " "
-			}
-			fmt.Printf("\n%s%s\033[%dD", leftPadding, ansi.Color(paddedTerm, "white+b:magenta"), len(paddedTerm))
-		}
-		if len(suggestions) > 0 {
-			fmt.Printf("\033[%dA", len(suggestions))
-		}
+		promptWidth := len(prompt) + index
+		displaySuggestions(scope, line, index, promptWidth)
 
 		bPrev := b[0]
 		os.Stdin.Read(b)
@@ -178,7 +149,7 @@ func Apply(scope *Scope) {
 		case 27: // ? This happens on key press
 		case 9: //TAB
 		case 10: //ENTER
-			fmt.Println()
+			fmt.Println("\033[0J")
 			if len(line) == 0 {
 				continue
 			}
@@ -190,7 +161,7 @@ func Apply(scope *Scope) {
 				fmt.Println("Error: ", err, resp)
 			} else {
 				respStr := Highlight(fmt.Sprintf("%#v", resp))
-				fmt.Printf("=> %s\033[0J\n", respStr)
+				fmt.Printf("=> %s\n", respStr)
 			}
 			history = append(history, line)
 			count++
@@ -201,7 +172,40 @@ func Apply(scope *Scope) {
 	}
 }
 
-// Type returns the reflect.Type of v. Used so packages don't need to import reflect.
-func Type(v interface{}) reflect.Type {
-	return reflect.TypeOf(v)
+// displaySuggestions renders the live autocomplete from GoCode.
+func displaySuggestions(scope *Scope, line string, index, promptWidth int) {
+	// Suggestions
+	suggestions, err := scope.SuggestionsGoCode(line, index)
+	if err != nil {
+		suggestions = []string{"ERR", err.Error()}
+	}
+	maxLength := 0
+	if len(suggestions) > 10 {
+		suggestions = suggestions[:10]
+	}
+	for _, term := range suggestions {
+		if len(term) > maxLength {
+			maxLength = len(term)
+		}
+	}
+	termWidth := getWidth()
+	for _, term := range suggestions {
+		paddedTerm := term
+		for len(paddedTerm) < maxLength {
+			paddedTerm += " "
+		}
+		var leftPadding string
+		for i := 0; i < promptWidth; i++ {
+			leftPadding += " "
+		}
+		if promptWidth > termWidth {
+			return
+		} else if len(paddedTerm)+promptWidth > termWidth {
+			paddedTerm = paddedTerm[:termWidth-promptWidth]
+		}
+		fmt.Printf("\n%s%s\033[%dD", leftPadding, ansi.Color(paddedTerm, "white+b:magenta"), len(paddedTerm))
+	}
+	if len(suggestions) > 0 {
+		fmt.Printf("\033[%dA", len(suggestions))
+	}
 }
