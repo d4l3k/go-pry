@@ -64,3 +64,8 @@ func Make(t interface{}, args ...interface{}) (interface{}, error) {
 		return nil, fmt.Errorf("unknown kind type %T", t)
 	}
 }
+
+// Len is a runtime replacement for the len function
+func Len(t interface{}) (interface{}, error) {
+	return reflect.ValueOf(t).Len(), nil
+}

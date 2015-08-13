@@ -32,10 +32,12 @@ type Scope struct {
 
 // NewScope creates a new initialized scope
 func NewScope() *Scope {
-	return &Scope{
+	s := &Scope{
 		Vals:  map[string]interface{}{},
 		Files: map[string]*ast.File{},
 	}
+	s.Set("_pryScope", s)
+	return s
 }
 
 // Get walks the scope and finds the value of interest
@@ -129,6 +131,7 @@ func (scope *Scope) Interpret(expr ast.Node) (interface{}, error) {
 		"false":  false,
 		"append": Append,
 		"make":   Make,
+		"len":    Len,
 	}
 
 	switch e := expr.(type) {
@@ -505,6 +508,33 @@ func (scope *Scope) Interpret(expr ast.Node) (interface{}, error) {
 		return nil, nil
 	case *ast.ExprStmt:
 		return scope.Interpret(e.X)
+	case *ast.DeclStmt:
+		return scope.Interpret(e.Decl)
+	case *ast.GenDecl:
+		for _, spec := range e.Specs {
+			if _, err := scope.Interpret(spec); err != nil {
+				return nil, err
+			}
+		}
+		return nil, nil
+	case *ast.ValueSpec:
+		typ, err := scope.Interpret(e.Type)
+		if err != nil {
+			return nil, err
+		}
+		zero := reflect.Zero(typ.(reflect.Type)).Interface()
+		for i, name := range e.Names {
+			if len(e.Values) > i {
+				v, err := scope.Interpret(e.Values[i])
+				if err != nil {
+					return nil, err
+				}
+				scope.Set(name.Name, v)
+			} else {
+				scope.Set(name.Name, zero)
+			}
+		}
+		return nil, nil
 	default:
 		return nil, fmt.Errorf("unknown node %#v", e)
 	}
