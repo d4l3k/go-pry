@@ -149,7 +149,7 @@ func Apply(scope *Scope) {
 		case 27: // ? This happens on key press
 		case 9: //TAB
 		case 10: //ENTER
-			fmt.Println("\033[0J")
+			fmt.Println("\033[100000C\033[0J")
 			if len(line) == 0 {
 				continue
 			}

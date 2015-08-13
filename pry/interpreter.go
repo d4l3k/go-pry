@@ -43,7 +43,7 @@ func (scope *Scope) Get(name string) (val interface{}, exists bool) {
 	currentScope := scope
 	for !exists && currentScope != nil {
 		val, exists = currentScope.Vals[name]
-		currentScope = scope.Parent
+		currentScope = currentScope.Parent
 	}
 	return
 }
@@ -57,7 +57,7 @@ func (scope *Scope) Set(name string, val interface{}) {
 		if exists {
 			currentScope.Vals[name] = val
 		}
-		currentScope = scope.Parent
+		currentScope = currentScope.Parent
 	}
 	if !exists {
 		scope.Vals[name] = val
@@ -74,6 +74,13 @@ func (scope *Scope) Keys() (keys []string) {
 		currentScope = scope.Parent
 	}
 	return
+}
+
+// NewChild creates a scope under the existing scope.
+func (scope *Scope) NewChild() *Scope {
+	s := NewScope()
+	s.Parent = scope
+	return s
 }
 
 // Func represents an interpreted function definition.
@@ -456,7 +463,46 @@ func (scope *Scope) Interpret(expr ast.Node) (interface{}, error) {
 			return rhs, nil
 		}
 		return rhs[0], nil
-
+	case *ast.RangeStmt:
+		s := scope.NewChild()
+		ranger, err := s.Interpret(e.X)
+		if err != nil {
+			return nil, err
+		}
+		var key, value string
+		if e.Key != nil {
+			key = e.Key.(*ast.Ident).Name
+		}
+		if e.Value != nil {
+			value = e.Value.(*ast.Ident).Name
+		}
+		rv := reflect.ValueOf(ranger)
+		switch rv.Type().Kind() {
+		case reflect.Array, reflect.Slice:
+			for i := 0; i < rv.Len(); i++ {
+				if len(key) > 0 {
+					s.Set(key, i)
+				}
+				if len(value) > 0 {
+					s.Set(value, rv.Index(i).Interface())
+				}
+				s.Interpret(e.Body)
+			}
+		case reflect.Map:
+			keys := rv.MapKeys()
+			for _, keyV := range keys {
+				if len(key) > 0 {
+					s.Set(key, keyV.Interface())
+				}
+				if len(value) > 0 {
+					s.Set(value, rv.MapIndex(keyV).Interface())
+				}
+				s.Interpret(e.Body)
+			}
+		default:
+			return nil, fmt.Errorf("ranging on %s is unsupported", rv.Type().Kind().String())
+		}
+		return nil, nil
 	case *ast.ExprStmt:
 		return scope.Interpret(e.X)
 	default:
