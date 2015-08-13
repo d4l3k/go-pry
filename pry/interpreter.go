@@ -438,7 +438,7 @@ func (scope *Scope) Interpret(expr ast.Node) (interface{}, error) {
 		if len(rhs) != 1 && len(rhs) != len(lhs) {
 			return nil, fmt.Errorf("assignment count mismatch: %d = %d", len(lhs), len(rhs))
 		}
-		if len(rhs) == 1 && reflect.TypeOf(rhs[0]).Kind() == reflect.Slice {
+		if len(rhs) == 1 && len(lhs) > 1 && reflect.TypeOf(rhs[0]).Kind() == reflect.Slice {
 			rhsV := reflect.ValueOf(rhs[0])
 			rhsLen := rhsV.Len()
 			if rhsLen != len(lhs) {
