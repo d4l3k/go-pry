@@ -293,6 +293,9 @@ func Debug(templ string, k ...interface{}) {
 
 // GetExports returns a string of gocode that represents the exports (constants/functions) of an ast.Package.
 func GetExports(pkg *ast.Package, added map[string]bool) string {
+	if pkg.Name == "main" {
+		return ""
+	}
 	vars := ""
 	for name, file := range pkg.Files {
 		if strings.HasSuffix(name, "_test.go") {
@@ -327,7 +330,7 @@ func GetExports(pkg *ast.Package, added map[string]bool) string {
 				case *ast.TypeSpec:
 					out, err := scope.Interpret(stmt.Type)
 					if err != nil {
-						Debug("ERR %s\n", err.Error())
+						Debug("TypeSpec ERR %s\n", err.Error())
 						//continue
 					} else {
 						scope.Set(obj.Name, out)
@@ -448,11 +451,31 @@ func handleExpr(vars []string, v ast.Expr) []string {
 			if funcName == "Pry" || funcName == "Apply" {
 				contexts = append(contexts, pryContext{(int)(expr.Pos() - 1), (int)(expr.End() - 1), vars})
 			}
+			//handleExpr(vars, fun.X)
 		case *ast.FuncLit:
-			handleStatement(vars, fun.Body)
+			handleExpr(vars, fun)
 		default:
 			Debug("Unknown function type %T\n", fun)
 		}
+		for _, arg := range expr.Args {
+			handleExpr(vars, arg)
+		}
+	case *ast.FuncLit:
+		if expr.Type.Params != nil {
+			for _, param := range expr.Type.Params.List {
+				for _, name := range param.Names {
+					vars = append(vars, name.Name)
+				}
+			}
+		}
+		if expr.Type.Results != nil {
+			for _, param := range expr.Type.Results.List {
+				for _, name := range param.Names {
+					vars = append(vars, name.Name)
+				}
+			}
+		}
+		handleStatement(vars, expr.Body)
 	default:
 		fmt.Printf("Unknown %T\n", expr)
 	}
