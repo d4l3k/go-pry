@@ -160,7 +160,7 @@ func (scope *Scope) Interpret(expr ast.Node) (interface{}, error) {
 		sel := e.Sel
 
 		rVal := reflect.ValueOf(X)
-		if rVal.Kind() != reflect.Struct {
+		if rVal.Kind() != reflect.Struct && rVal.Kind() != reflect.Ptr {
 			return nil, fmt.Errorf("%#v is not a struct and thus has no field %#v", X, sel.Name)
 		}
 
@@ -173,14 +173,14 @@ func (scope *Scope) Interpret(expr ast.Node) (interface{}, error) {
 			return nil, fmt.Errorf("unknown field %#v", sel.Name)
 		}
 
-		zero := reflect.ValueOf(nil)
-		field := rVal.FieldByName(sel.Name)
-		if field != zero {
-			return field.Interface(), nil
-		}
-		method := rVal.MethodByName(sel.Name)
-		if method != zero {
+		if method := rVal.MethodByName(sel.Name); method.IsValid() {
 			return method.Interface(), nil
+		}
+		if rVal.Kind() == reflect.Ptr {
+			rVal = rVal.Elem()
+		}
+		if field := rVal.FieldByName(sel.Name); field.IsValid() {
+			return field.Interface(), nil
 		}
 		return nil, fmt.Errorf("unknown field %#v", sel.Name)
 
