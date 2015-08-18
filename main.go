@@ -443,7 +443,13 @@ func handleIdents(vars []string, idents []*ast.Ident) []string {
 func handleExpr(vars []string, v ast.Expr) []string {
 	switch expr := v.(type) {
 	case *ast.Ident:
-		vars = append(vars, expr.Name)
+		varMap := make(map[string]bool)
+		for _, v := range vars {
+			varMap[v] = true
+		}
+		if !varMap[expr.Name] {
+			vars = append(vars, expr.Name)
+		}
 	case *ast.CallExpr:
 		switch fun := expr.Fun.(type) {
 		case *ast.SelectorExpr:
@@ -461,31 +467,23 @@ func handleExpr(vars []string, v ast.Expr) []string {
 			handleExpr(vars, arg)
 		}
 	case *ast.FuncLit:
-		varMap := make(map[string]bool)
-		for _, v := range vars {
-			varMap[v] = true
-		}
 		if expr.Type.Params != nil {
 			for _, param := range expr.Type.Params.List {
 				for _, name := range param.Names {
-					if !varMap[name.Name] {
-						vars = append(vars, name.Name)
-					}
+					vars = handleExpr(vars, name)
 				}
 			}
 		}
 		if expr.Type.Results != nil {
 			for _, param := range expr.Type.Results.List {
 				for _, name := range param.Names {
-					if !varMap[name.Name] {
-						vars = append(vars, name.Name)
-					}
+					vars = handleExpr(vars, name)
 				}
 			}
 		}
 		handleStatement(vars, expr.Body)
 	default:
-		fmt.Printf("Unknown %T\n", expr)
+		Debug("Unknown %T\n", expr)
 	}
 	return vars
 }
