@@ -10,7 +10,7 @@ import (
 )
 
 func main() {
-	a := 5
+	w := 6
 
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		b := "toast"
@@ -18,7 +18,9 @@ func main() {
 		pry.Pry()
 		_ = b
 	})
-	_ = a
+
+	pry.Pry()
 
 	log.Fatal(http.ListenAndServe(":8080", nil))
+	_ = w
 }

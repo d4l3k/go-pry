@@ -461,17 +461,25 @@ func handleExpr(vars []string, v ast.Expr) []string {
 			handleExpr(vars, arg)
 		}
 	case *ast.FuncLit:
+		varMap := make(map[string]bool)
+		for _, v := range vars {
+			varMap[v] = true
+		}
 		if expr.Type.Params != nil {
 			for _, param := range expr.Type.Params.List {
 				for _, name := range param.Names {
-					vars = append(vars, name.Name)
+					if !varMap[name.Name] {
+						vars = append(vars, name.Name)
+					}
 				}
 			}
 		}
 		if expr.Type.Results != nil {
 			for _, param := range expr.Type.Results.List {
 				for _, name := range param.Names {
-					vars = append(vars, name.Name)
+					if !varMap[name.Name] {
+						vars = append(vars, name.Name)
+					}
 				}
 			}
 		}
