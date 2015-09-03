@@ -229,24 +229,23 @@ func main() {
 		return
 	}
 
+	testsRequired := cmdArgs[0] == "test"
 	for _, dir := range goDirs {
 		filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
-			if strings.HasSuffix(path, ".go") {
-				processed := false
-				for _, file := range processedFiles {
-					if file == path {
-						processed = true
-					}
+			if !testsRequired && strings.HasSuffix(path, "_test.go") || !strings.HasSuffix(path, ".go") {
+				return nil
+			}
+			for _, file := range processedFiles {
+				if file == path {
+					return nil
 				}
-				if !processed {
-					file, err := InjectPry(path)
-					if err != nil {
-						panic(err)
-					}
-					if file != "" {
-						modifiedFiles = append(modifiedFiles, path)
-					}
-				}
+			}
+			file, err := InjectPry(path)
+			if err != nil {
+				panic(err)
+			}
+			if file != "" {
+				modifiedFiles = append(modifiedFiles, path)
 			}
 			return nil
 		})
