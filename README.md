@@ -52,3 +52,5 @@ go-pry is greatly inspired by [Pry REPL](http://pryrepl.org) for Ruby.
 ## License
 
 go-pry is licensed under the MIT license.
+
+Made by [Tristan Rice](https://fn.lc).
