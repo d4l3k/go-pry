@@ -454,13 +454,15 @@ func ComputeBinaryOp(xI, yI interface{}, op token.Token) (interface{}, error) {
 			yUint = uint64(yV)
 		case int64:
 			yUint = uint64(yV)
+		case uint:
+			yUint = uint64(yV)
+		case uintptr:
+			yUint = uint64(yV)
 		case uint8:
 			yUint = uint64(yV)
 		case uint16:
 			yUint = uint64(yV)
 		case uint32:
-			yUint = uint64(yV)
-		case uint64:
 			yUint = uint64(yV)
 		case float32:
 			yUint = uint64(yV)

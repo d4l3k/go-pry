@@ -1,6 +1,7 @@
 package pry
 
 import (
+	"fmt"
 	"reflect"
 	"testing"
 )
@@ -273,6 +274,174 @@ func TestBasicMath(t *testing.T) {
 		if !reflect.DeepEqual(expected, out) {
 			t.Errorf("Expected %#v got %#v.", expected, out)
 		}
+	}
+}
+
+func TestMathShifting(t *testing.T) {
+	t.Parallel()
+
+	types := []string{
+		"int", "int8", "int16", "int32", "int64",
+		"uint", "uint8", "uint16", "uint32", "uint64",
+		"uintptr",
+	}
+	cases := []struct {
+		l      int
+		op     string
+		r, out int
+	}{
+		{3, "%", 2, 1},
+		{7, "&", 2, 2},
+		{6, "|", 2, 6},
+		{6, "^", 2, 4},
+		{2, "<<", 2, 8},
+		{8, ">>", 2, 2},
+		{6, "&^", 4, 2},
+	}
+	scope := NewScope()
+	for _, typ := range types {
+		for _, td := range cases {
+			query := fmt.Sprintf("%s(%d) %s %s(%d)", typ, td.l, td.op, typ, td.r)
+			outI, err := scope.InterpretString(query)
+			if err != nil {
+				t.Error(err)
+			}
+			out := interfaceToInt(outI)
+			if !reflect.DeepEqual(td.out, out) {
+				t.Errorf("Expected %#v = %#v got %#v.", query, td.out, out)
+			}
+		}
+	}
+}
+
+func TestMathBasic(t *testing.T) {
+	t.Parallel()
+
+	types := []string{
+		"int", "int8", "int16", "int32", "int64",
+		"uint", "uint8", "uint16", "uint32", "uint64",
+		"uintptr",
+		"float32", "float64",
+	}
+	cases := []struct {
+		l      int
+		op     string
+		r, out int
+	}{
+		{3, "+", 2, 5},
+		{3, "-", 2, 1},
+		{3, "*", 2, 6},
+		{4, "/", 2, 2},
+		{4, ">", 3, 1},
+		{3, ">", 4, -1},
+		{4, ">=", 3, 1},
+		{3, ">=", 4, -1},
+		{4, "<", 3, -1},
+		{3, "<", 4, 1},
+		{4, "<=", 3, -1},
+		{3, "<=", 4, 1},
+		{3, "==", 3, 1},
+		{3, "==", 4, -1},
+		{3, "!=", 3, -1},
+		{3, "!=", 4, 1},
+	}
+	scope := NewScope()
+	for _, typ := range types {
+		for _, td := range cases {
+			query := fmt.Sprintf("%s(%d) %s %s(%d)", typ, td.l, td.op, typ, td.r)
+			outI, err := scope.InterpretString(query)
+			if err != nil {
+				t.Error(err)
+			}
+			out := interfaceToInt(outI)
+			if !reflect.DeepEqual(td.out, out) {
+				t.Errorf("Expected %#v = %#v got %#v.", query, td.out, out)
+			}
+		}
+	}
+}
+
+func TestBoolConds(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		l      bool
+		op     string
+		r, out bool
+	}{
+		{true, "&&", true, true},
+		{true, "&&", false, false},
+		{false, "&&", true, false},
+		{false, "&&", false, false},
+		{true, "||", true, true},
+		{true, "||", false, true},
+		{false, "||", true, true},
+		{false, "||", false, false},
+	}
+	scope := NewScope()
+	for _, td := range cases {
+		query := fmt.Sprintf("%#v %s %#v", td.l, td.op, td.r)
+		outI, err := scope.InterpretString(query)
+		if err != nil {
+			t.Error(err)
+		}
+		out := outI.(bool)
+		if !reflect.DeepEqual(td.out, out) {
+			t.Errorf("Expected %#v = %#v got %#v.", query, td.out, out)
+		}
+	}
+}
+
+func interfaceToInt(i interface{}) int {
+	switch v := i.(type) {
+	case int:
+		return int(v)
+	case int8:
+		return int(v)
+	case int16:
+		return int(v)
+	case int32:
+		return int(v)
+	case int64:
+		return int(v)
+	case uint:
+		return int(v)
+	case uint8:
+		return int(v)
+	case uint16:
+		return int(v)
+	case uint32:
+		return int(v)
+	case uint64:
+		return int(v)
+	case uintptr:
+		return int(v)
+	case float32:
+		return int(v)
+	case float64:
+		return int(v)
+	case bool:
+		if v {
+			return 1
+		}
+		return -1
+	}
+	return 0
+}
+
+func TestStringConcat(t *testing.T) {
+	t.Parallel()
+
+	scope := NewScope()
+	scope.Set("a", 5)
+
+	out, err := scope.InterpretString("\"hello\" + \"foo\"")
+	if err != nil {
+		t.Error(err)
+	}
+	expected := "hellofoo"
+	if !reflect.DeepEqual(expected, out) {
+		t.Errorf("Expected %#v got %#v.", expected, out)
 	}
 }
 
