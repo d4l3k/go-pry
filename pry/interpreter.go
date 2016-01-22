@@ -466,6 +466,27 @@ func (scope *Scope) Interpret(expr ast.Node) (interface{}, error) {
 			return rhs, nil
 		}
 		return rhs[0], nil
+	case *ast.IncDecStmt:
+		var dir string
+		switch e.Tok {
+		case token.INC:
+			dir = "1"
+		case token.DEC:
+			dir = "-1"
+		}
+		ass := &ast.AssignStmt{
+			Tok: token.ASSIGN,
+			Lhs: []ast.Expr{e.X},
+			Rhs: []ast.Expr{&ast.BinaryExpr{
+				X:  e.X,
+				Op: token.ADD,
+				Y: &ast.BasicLit{
+					Kind:  token.INT,
+					Value: dir,
+				},
+			}},
+		}
+		return scope.Interpret(ass)
 	case *ast.RangeStmt:
 		s := scope.NewChild()
 		ranger, err := s.Interpret(e.X)
@@ -535,6 +556,31 @@ func (scope *Scope) Interpret(expr ast.Node) (interface{}, error) {
 			}
 		}
 		return nil, nil
+	case *ast.ForStmt:
+		s := scope.NewChild()
+		if _, err := s.Interpret(e.Init); err != nil {
+			return nil, err
+		}
+		var last interface{}
+		for {
+			cond, err := s.Interpret(e.Cond)
+			if err != nil {
+				return nil, err
+			}
+			if cont, ok := cond.(bool); !ok {
+				return nil, fmt.Errorf("for loop requires a boolean condition not %#v", cond)
+			} else if !cont {
+				return last, nil
+			}
+			last, err = s.Interpret(e.Body)
+			if err != nil {
+				return nil, err
+			}
+			if _, err := s.Interpret(e.Post); err != nil {
+				return nil, err
+			}
+		}
+
 	default:
 		return nil, fmt.Errorf("unknown node %#v", e)
 	}

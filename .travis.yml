@@ -5,6 +5,13 @@ go:
   - 1.4.2
   - tip
 
-script: go test -v . ./pry
 install:
   - go get -t -v . ./pry
+
+before_install:
+  - go get github.com/axw/gocov/gocov
+  - go get github.com/mattn/goveralls
+  - if ! go get github.com/golang/tools/cmd/cover; then go get golang.org/x/tools/cmd/cover; fi
+
+script:
+    - $HOME/gopath/bin/goveralls -service=travis-ci -v . ./pry

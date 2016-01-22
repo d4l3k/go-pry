@@ -7,6 +7,8 @@ import (
 
 // Literals
 func TestStringLiteral(t *testing.T) {
+	t.Parallel()
+
 	scope := NewScope()
 	out, err := scope.InterpretString("\"Hello!\"")
 	if err != nil {
@@ -17,6 +19,8 @@ func TestStringLiteral(t *testing.T) {
 	}
 }
 func TestIntLiteral(t *testing.T) {
+	t.Parallel()
+
 	scope := NewScope()
 	out, err := scope.InterpretString("-1234")
 	if err != nil {
@@ -27,6 +31,8 @@ func TestIntLiteral(t *testing.T) {
 	}
 }
 func TestHexIntLiteral(t *testing.T) {
+	t.Parallel()
+
 	scope := NewScope()
 	out, err := scope.InterpretString("0xC123")
 	if err != nil {
@@ -38,6 +44,8 @@ func TestHexIntLiteral(t *testing.T) {
 	}
 }
 func TestOctalIntLiteral(t *testing.T) {
+	t.Parallel()
+
 	scope := NewScope()
 	out, err := scope.InterpretString("03272")
 	if err != nil {
@@ -49,6 +57,8 @@ func TestOctalIntLiteral(t *testing.T) {
 	}
 }
 func TestCharLiteral(t *testing.T) {
+	t.Parallel()
+
 	scope := NewScope()
 	out, err := scope.InterpretString("'a'")
 	if err != nil {
@@ -59,6 +69,8 @@ func TestCharLiteral(t *testing.T) {
 	}
 }
 func TestArrayLiteral(t *testing.T) {
+	t.Parallel()
+
 	scope := NewScope()
 	out, err := scope.InterpretString("[]int{1,2,3,4}")
 	if err != nil {
@@ -70,6 +82,8 @@ func TestArrayLiteral(t *testing.T) {
 	}
 }
 func TestMapLiteral(t *testing.T) {
+	t.Parallel()
+
 	scope := NewScope()
 	out, err := scope.InterpretString("map[string]int{\"duck\": 5,\n \"banana\": -123,\n}")
 	if err != nil {
@@ -85,6 +99,8 @@ func TestMapLiteral(t *testing.T) {
 }
 
 func TestTypeCast(t *testing.T) {
+	t.Parallel()
+
 	scope := NewScope()
 	scope.Set("a", -1234.0)
 	out, err := scope.InterpretString("int(a)")
@@ -99,6 +115,8 @@ func TestTypeCast(t *testing.T) {
 
 // Selectors and Ident
 func TestBasicIdent(t *testing.T) {
+	t.Parallel()
+
 	scope := NewScope()
 	scope.Set("a", 5)
 	out, err := scope.InterpretString("a")
@@ -111,6 +129,8 @@ func TestBasicIdent(t *testing.T) {
 	}
 }
 func TestMissingBasicIdent(t *testing.T) {
+	t.Parallel()
+
 	scope := NewScope()
 	out, err := scope.InterpretString("a")
 	if err == nil || out != nil {
@@ -118,6 +138,8 @@ func TestMissingBasicIdent(t *testing.T) {
 	}
 }
 func TestMapIdent(t *testing.T) {
+	t.Parallel()
+
 	scope := NewScope()
 	scope.Set("a", map[string]int{
 		"B": 10,
@@ -132,6 +154,8 @@ func TestMapIdent(t *testing.T) {
 	}
 }
 func TestMissingMapIdent(t *testing.T) {
+	t.Parallel()
+
 	scope := NewScope()
 	scope.Set("a", map[string]int{})
 
@@ -144,6 +168,8 @@ func TestMissingMapIdent(t *testing.T) {
 	}
 }
 func TestArrIdent(t *testing.T) {
+	t.Parallel()
+
 	scope := NewScope()
 	scope.Set("a", []int{1, 2, 3})
 
@@ -158,6 +184,8 @@ func TestArrIdent(t *testing.T) {
 }
 
 func TestMissingArrIdent(t *testing.T) {
+	t.Parallel()
+
 	scope := NewScope()
 	scope.Set("a", []int{1})
 
@@ -168,6 +196,8 @@ func TestMissingArrIdent(t *testing.T) {
 }
 
 func TestSlice(t *testing.T) {
+	t.Parallel()
+
 	scope := NewScope()
 	scope.Set("a", []int{1, 2, 3, 4})
 
@@ -192,6 +222,8 @@ func (a testStruct) B() int {
 }
 
 func TestSelector(t *testing.T) {
+	t.Parallel()
+
 	scope := NewScope()
 	scope.Set("a", testStruct{A: 1})
 
@@ -205,6 +237,8 @@ func TestSelector(t *testing.T) {
 	}
 }
 func TestSelectorFunc(t *testing.T) {
+	t.Parallel()
+
 	scope := NewScope()
 	scope.Set("a", testStruct{A: 1})
 
@@ -220,6 +254,8 @@ func TestSelectorFunc(t *testing.T) {
 
 // Basic Math
 func TestBasicMath(t *testing.T) {
+	t.Parallel()
+
 	scope := NewScope()
 	pairs := map[string]interface{}{
 		"2*3":        6,
@@ -241,6 +277,8 @@ func TestBasicMath(t *testing.T) {
 }
 
 func TestParens(t *testing.T) {
+	t.Parallel()
+
 	scope := NewScope()
 	scope.Set("a", 5)
 
@@ -256,6 +294,8 @@ func TestParens(t *testing.T) {
 
 // Test Make
 func TestMakeSlice(t *testing.T) {
+	t.Parallel()
+
 	scope := NewScope()
 	out, err := scope.InterpretString("make([]int, 1, 10)")
 	if err != nil {
@@ -267,6 +307,8 @@ func TestMakeSlice(t *testing.T) {
 	}
 }
 func TestMakeChan(t *testing.T) {
+	t.Parallel()
+
 	scope := NewScope()
 	out, err := scope.InterpretString("make(chan int, 10)")
 	if err != nil {
@@ -278,6 +320,8 @@ func TestMakeChan(t *testing.T) {
 	}
 }
 func TestMakeUnknown(t *testing.T) {
+	t.Parallel()
+
 	scope := NewScope()
 	out, err := scope.InterpretString("make(int)")
 	if err == nil || out != nil {
@@ -286,6 +330,8 @@ func TestMakeUnknown(t *testing.T) {
 }
 
 func TestAppend(t *testing.T) {
+	t.Parallel()
+
 	scope := NewScope()
 	scope.Set("a", []int{1})
 
@@ -305,6 +351,8 @@ func TestAppend(t *testing.T) {
 }
 
 func TestDeclareAssignVar(t *testing.T) {
+	t.Parallel()
+
 	scope := NewScope()
 	scope.Set("a", []int{1})
 
@@ -328,6 +376,8 @@ func TestDeclareAssignVar(t *testing.T) {
 }
 
 func TestDeclareAssign(t *testing.T) {
+	t.Parallel()
+
 	scope := NewScope()
 	scope.Set("a", []int{1})
 
@@ -343,6 +393,8 @@ func TestDeclareAssign(t *testing.T) {
 }
 
 func TestAssign(t *testing.T) {
+	t.Parallel()
+
 	scope := NewScope()
 	scope.Set("a", 1)
 
@@ -360,6 +412,8 @@ func TestAssign(t *testing.T) {
 // Statements
 
 func TestFuncDeclAndCall(t *testing.T) {
+	t.Parallel()
+
 	scope := NewScope()
 
 	out, err := scope.InterpretString("a := func(){ return 5 }")
@@ -371,6 +425,46 @@ func TestFuncDeclAndCall(t *testing.T) {
 		t.Error(err)
 	}
 	expected := 5
+	if !reflect.DeepEqual(expected, out) {
+		t.Errorf("Expected %#v got %#v.", expected, out)
+	}
+}
+
+// Control structures
+
+func TestFor(t *testing.T) {
+	t.Parallel()
+
+	scope := NewScope()
+
+	out, err := scope.InterpretString("a := 1; for i := 0; i < 5; i++ { a++ }; a")
+	if err != nil {
+		t.Error(err)
+	}
+	expected := 6
+	if !reflect.DeepEqual(expected, out) {
+		t.Errorf("Expected %#v got %#v.", expected, out)
+	}
+
+	out, err = scope.InterpretString("a := 1; for i := 5; i > 0; i-- { a++ }; a")
+	if err != nil {
+		t.Error(err)
+	}
+	if !reflect.DeepEqual(expected, out) {
+		t.Errorf("Expected %#v got %#v.", expected, out)
+	}
+}
+
+func TestForRange(t *testing.T) {
+	t.Parallel()
+
+	scope := NewScope()
+
+	out, err := scope.InterpretString("a := 1; for i, c := range []int{1,2,3} {a=a+i+c}; a")
+	if err != nil {
+		t.Error(err)
+	}
+	expected := 1 + 0 + 1 + 2 + 1 + 2 + 3
 	if !reflect.DeepEqual(expected, out) {
 		t.Errorf("Expected %#v got %#v.", expected, out)
 	}
