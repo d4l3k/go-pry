@@ -8,6 +8,8 @@ import (
 
 // Make sure the highlighter doesn't change the code.
 func TestHighlightSafe(t *testing.T) {
+	t.Parallel()
+
 	fileBytes, err := ioutil.ReadFile("../example/file/file.go")
 	if err != nil {
 		t.Error(err)

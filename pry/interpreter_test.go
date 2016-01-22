@@ -19,6 +19,7 @@ func TestStringLiteral(t *testing.T) {
 		t.Error("Expected Hello!")
 	}
 }
+
 func TestIntLiteral(t *testing.T) {
 	t.Parallel()
 
@@ -624,12 +625,27 @@ func TestFor(t *testing.T) {
 	}
 }
 
-func TestForRange(t *testing.T) {
+func TestForRangeArray(t *testing.T) {
 	t.Parallel()
 
 	scope := NewScope()
 
 	out, err := scope.InterpretString("a := 1; for i, c := range []int{1,2,3} {a=a+i+c}; a")
+	if err != nil {
+		t.Error(err)
+	}
+	expected := 1 + 0 + 1 + 2 + 1 + 2 + 3
+	if !reflect.DeepEqual(expected, out) {
+		t.Errorf("Expected %#v got %#v.", expected, out)
+	}
+}
+
+func TestForRangeMap(t *testing.T) {
+	t.Parallel()
+
+	scope := NewScope()
+
+	out, err := scope.InterpretString("a := 1; for i, c := range map[int]int{0: 1, 1: 2, 2: 3} {a=a+i+c}; a")
 	if err != nil {
 		t.Error(err)
 	}
