@@ -13,10 +13,9 @@ import (
 	"strconv"
 	"strings"
 
-	"golang.org/x/tools/go/types"
-
+	"go/types"
 	// Used by types for import determination
-	_ "golang.org/x/tools/go/gcimporter"
+	"golang.org/x/tools/go/gcimporter15"
 )
 
 // Scope is a string-interface key-value pair that represents variables/functions in scope.
@@ -591,7 +590,13 @@ func (scope *Scope) ConfigureTypes(path string, line int) error {
 	scope.path = path
 	scope.line = line
 	scope.fset = token.NewFileSet() // positions are relative to fset
-	scope.config = &types.Config{FakeImportC: true}
+	scope.config = &types.Config{
+		FakeImportC: true,
+		Importer: importer{
+			impFn:    gcImporter,
+			packages: make(map[string]*types.Package),
+		},
+	}
 
 	// Parse the file containing this very example
 	// but stop after processing the imports.
@@ -739,4 +744,20 @@ func ValuesToInterfaces(vals []reflect.Value) []interface{} {
 		inters[i] = val.Interface()
 	}
 	return inters
+}
+
+// These lines were taken from github.com/golang/lint, see that project for
+// more information.
+var gcImporter = gcimporter.Import
+
+// importer implements go/types.Importer.
+// It also implements go/types.ImporterFrom, which was new in Go 1.6,
+// so vendoring will work.
+type importer struct {
+	impFn    func(packages map[string]*types.Package, path, srcDir string) (*types.Package, error)
+	packages map[string]*types.Package
+}
+
+func (i importer) Import(path string) (*types.Package, error) {
+	return i.impFn(i.packages, path, "")
 }
