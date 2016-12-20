@@ -2,7 +2,6 @@ package pry
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
 	"go/ast"
 	"go/parser"
@@ -12,6 +11,8 @@ import (
 	"reflect"
 	"strconv"
 	"strings"
+
+	"github.com/pkg/errors"
 
 	"go/types"
 	// Used by types for import determination
@@ -602,7 +603,7 @@ func (scope *Scope) ConfigureTypes(path string, line int) error {
 	// but stop after processing the imports.
 	f, err := parser.ParseDir(scope.fset, filepath.Dir(scope.path), nil, 0)
 	if err != nil {
-		return err
+		return errors.Wrapf(err, "parser.ParseDir %q", scope.path)
 	}
 
 	for _, pkg := range f {
@@ -613,7 +614,7 @@ func (scope *Scope) ConfigureTypes(path string, line int) error {
 
 	_, errs := scope.TypeCheck()
 	if len(errs) > 0 {
-		return errs[0]
+		return errors.Wrap(errs[0], "failed to TypeCheck")
 	}
 
 	return nil

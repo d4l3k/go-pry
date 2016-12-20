@@ -63,14 +63,18 @@ func InjectPry(filePath string) (string, error) {
 			if err != nil {
 				panic(err)
 			}
+			importName := pkg.Name
+			if imp.Name != nil {
+				importName = imp.Name.Name
+			}
 			pkgAst, err := parser.ParseDir(fset, pkg.Dir, nil, parser.ParseComments)
 			if err != nil {
 				panic(err)
 			}
-			pair := "\"" + pkg.Name + "\": pry.Package{Name: \"" + pkg.Name + "\", Functions: map[string]interface{}{"
+			pair := "\"" + importName + "\": pry.Package{Name: \"" + pkg.Name + "\", Functions: map[string]interface{}{"
 			added := make(map[string]bool)
 			for _, nPkg := range pkgAst {
-				pair += GetExports(nPkg, added)
+				pair += GetExports(importName, nPkg, added)
 			}
 			pair += "}}, "
 			packagePairs = append(packagePairs, pair)
@@ -295,7 +299,7 @@ func Debug(templ string, k ...interface{}) {
 }
 
 // GetExports returns a string of gocode that represents the exports (constants/functions) of an ast.Package.
-func GetExports(pkg *ast.Package, added map[string]bool) string {
+func GetExports(importName string, pkg *ast.Package, added map[string]bool) string {
 	if pkg.Name == "main" {
 		return ""
 	}
@@ -342,7 +346,7 @@ func GetExports(pkg *ast.Package, added map[string]bool) string {
 				}
 
 				if obj.Kind != ast.Typ || isType {
-					path := pkg.Name + "." + k
+					path := importName + "." + k
 					vars += "\"" + k + "\": "
 					if isType {
 						out, _ := scope.Get(obj.Name)
