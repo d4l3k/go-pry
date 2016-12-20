@@ -38,6 +38,10 @@ func ExecuteGoCmd(args []string) {
 // InjectPry walks the scope and replaces pry.Pry with pry.Apply(pry.Scope{...}).
 func InjectPry(filePath string) (string, error) {
 	Debug("Prying into %s\n", filePath)
+	filePath, err := filepath.Abs(filePath)
+	if err != nil {
+		return "", nil
+	}
 
 	contexts = make([]pryContext, 0)
 
