@@ -157,7 +157,7 @@ func Apply(scope *Scope) {
 			}
 			line = line[:index] + string(r) + line[index:]
 			index++
-		case 127: // Backspace
+		case 127, '\b': // Backspace
 			if len(line) > 0 {
 				line = line[:index-1] + line[index:]
 				index--
