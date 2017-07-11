@@ -2,17 +2,35 @@ package pry
 
 import (
 	"fmt"
+	"io"
 	"io/ioutil"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
 
 	"go/ast"
 
+	"github.com/mattn/go-colorable"
+	gotty "github.com/mattn/go-tty"
 	"github.com/mgutz/ansi"
 )
+
+var (
+	out io.Writer = os.Stdout
+	tty *gotty.TTY
+)
+
+func init() {
+	if runtime.GOOS == "windows" {
+		out = colorable.NewColorableStdout()
+	}
+	var err error
+	tty, err = gotty.Open()
+	if err != nil {
+		panic(err)
+	}
+}
 
 // Pry does nothing. It only exists so running code without go-pry doesn't throw an error.
 func Pry(v ...interface{}) {
@@ -23,12 +41,6 @@ func Apply(scope *Scope) {
 	if scope.Files == nil {
 		scope.Files = map[string]*ast.File{}
 	}
-	// disable input buffering
-	exec.Command("stty", "-F", "/dev/tty", "cbreak", "min", "1").Run()
-	// do not display entered characters on the screen
-	exec.Command("stty", "-F", "/dev/tty", "-echo").Run()
-	// restore the echoing state when exiting
-	defer exec.Command("stty", "-F", "/dev/tty", "echo").Run()
 
 	_, filePathRaw, lineNum, _ := runtime.Caller(1)
 	filePath := filepath.Dir(filePathRaw) + "/." + filepath.Base(filePathRaw) + "pry"
@@ -38,10 +50,10 @@ func Apply(scope *Scope) {
 		panic(err)
 	}
 
-	fmt.Printf("\nFrom %s @ line %d :\n\n", filePathRaw, lineNum)
+	fmt.Fprintf(out, "\nFrom %s @ line %d :\n\n", filePathRaw, lineNum)
 	file, err := ioutil.ReadFile(filePath)
 	if err != nil {
-		fmt.Println(err)
+		fmt.Fprintln(out, err)
 	}
 	lines := strings.Split((string)(file), "\n")
 	lineNum--
@@ -65,9 +77,9 @@ func Apply(scope *Scope) {
 		}
 		num := ansi.Color(numStr, "blue+b")
 		highlightedLine := Highlight(strings.Replace(lines[i], "\t", "  ", -1))
-		fmt.Printf(" %s %s: %s\n", caret, num, highlightedLine)
+		fmt.Fprintf(out, " %s %s: %s\n", caret, num, highlightedLine)
 	}
-	fmt.Println()
+	fmt.Fprintln(out)
 
 	history := []string{}
 	currentPos := 0
@@ -75,22 +87,29 @@ func Apply(scope *Scope) {
 	line := ""
 	count := 0
 	index := 0
-	b := make([]byte, 1)
+	r := rune(0)
 	for {
 		prompt := fmt.Sprintf("[%d] go-pry> ", currentPos)
-		fmt.Printf("\r\033[K%s%s \033[0J\033[%dD", prompt, Highlight(line), len(line)-index+1)
+		fmt.Fprintf(out, "\r\033[K%s%s \033[0J\033[%dD", prompt, Highlight(line), len(line)-index+1)
 
 		promptWidth := len(prompt) + index
 		displaySuggestions(scope, line, index, promptWidth)
 
-		bPrev := b[0]
-		os.Stdin.Read(b)
-		switch b[0] {
+		bPrev := r
+
+		r = 0
+		for r == 0 {
+			r, err = tty.ReadRune()
+			if err != nil {
+				panic(err)
+			}
+		}
+		switch r {
 		default:
-			if bPrev == 27 && b[0] == 91 {
+			if bPrev == 27 && r == 91 {
 				continue
 			} else if bPrev == 91 {
-				switch b[0] {
+				switch r {
 				case 66: // Down
 					currentPos++
 					if len(history) < currentPos {
@@ -126,7 +145,7 @@ func Apply(scope *Scope) {
 					}
 					continue
 				}
-			} else if bPrev == 51 && b[0] == 126 { // DELETE
+			} else if bPrev == 51 && r == 126 { // DELETE
 				line = line[:index-1] + line[index:]
 				if len(line) > 0 && index < len(line) {
 					line = line[:index] + line[index+1:]
@@ -136,7 +155,7 @@ func Apply(scope *Scope) {
 				}
 				continue
 			}
-			line = line[:index] + string(b) + line[index:]
+			line = line[:index] + string(r) + line[index:]
 			index++
 		case 127: // Backspace
 			if len(line) > 0 {
@@ -148,8 +167,8 @@ func Apply(scope *Scope) {
 			}
 		case 27: // ? This happens on key press
 		case 9: //TAB
-		case 10: //ENTER
-			fmt.Println("\033[100000C\033[0J")
+		case 10, 13: //ENTER
+			fmt.Fprintln(out, "\033[100000C\033[0J")
 			if len(line) == 0 {
 				continue
 			}
@@ -158,10 +177,10 @@ func Apply(scope *Scope) {
 			}
 			resp, err := scope.InterpretString(line)
 			if err != nil {
-				fmt.Println("Error: ", err, resp)
+				fmt.Fprintln(out, "Error: ", err, resp)
 			} else {
 				respStr := Highlight(fmt.Sprintf("%#v", resp))
-				fmt.Printf("=> %s\n", respStr)
+				fmt.Fprintf(out, "=> %s\n", respStr)
 			}
 			history = append(history, line)
 			count++
@@ -188,7 +207,7 @@ func displaySuggestions(scope *Scope, line string, index, promptWidth int) {
 			maxLength = len(term)
 		}
 	}
-	termWidth := getWidth()
+	termWidth, _, _ := tty.Size()
 	for _, term := range suggestions {
 		paddedTerm := term
 		for len(paddedTerm) < maxLength {
@@ -203,9 +222,9 @@ func displaySuggestions(scope *Scope, line string, index, promptWidth int) {
 		} else if len(paddedTerm)+promptWidth > termWidth {
 			paddedTerm = paddedTerm[:termWidth-promptWidth]
 		}
-		fmt.Printf("\n%s%s\033[%dD", leftPadding, ansi.Color(paddedTerm, "white+b:magenta"), len(paddedTerm))
+		fmt.Fprintf(out, "\n%s%s\033[%dD", leftPadding, ansi.Color(paddedTerm, "white+b:magenta"), len(paddedTerm))
 	}
 	if len(suggestions) > 0 {
-		fmt.Printf("\033[%dA", len(suggestions))
+		fmt.Fprintf(out, "\033[%dA", len(suggestions))
 	}
 }
