@@ -41,7 +41,8 @@ type Scope struct {
 	line   int
 	fset   *token.FileSet
 
-	isSelect bool
+	isSelect   bool
+	typeAssert reflect.Type
 
 	sync.Mutex
 }
@@ -577,7 +578,10 @@ func (scope *Scope) Interpret(expr ast.Node) (interface{}, error) {
 		if err != nil {
 			return nil, err
 		}
-		zero := reflect.Zero(typ.(reflect.Type)).Interface()
+		var zero interface{}
+		if typ != nil {
+			zero = reflect.Zero(typ.(reflect.Type)).Interface()
+		}
 		for i, name := range e.Names {
 			if len(e.Values) > i {
 				v, err := scope.Interpret(e.Values[i])
@@ -688,8 +692,132 @@ func (scope *Scope) Interpret(expr ast.Node) (interface{}, error) {
 			time.Sleep(10 * time.Millisecond)
 		}
 
+	case *ast.SwitchStmt:
+		list := e.Body.List
+		var defaultCase *ast.CaseClause
+		var clauses []*ast.CaseClause
+		for _, stmt := range list {
+			cc := stmt.(*ast.CaseClause)
+			if cc.List == nil {
+				defaultCase = cc
+			} else {
+				clauses = append(clauses, cc)
+			}
+		}
+
+		currentScope := scope.NewChild()
+		if e.Init != nil {
+			if _, err := currentScope.Interpret(e.Init); err != nil {
+				return nil, err
+			}
+		}
+
+		var err error
+		var want interface{}
+		if e.Tag != nil {
+			want, err = currentScope.Interpret(e.Tag)
+		} else {
+			want = true
+		}
+		if err != nil {
+			return nil, err
+		}
+
+		for _, cc := range clauses {
+			for _, c := range cc.List {
+				child := currentScope.NewChild()
+				out, err := child.Interpret(c)
+				if err != nil {
+					return nil, err
+				}
+				if reflect.DeepEqual(out, want) {
+					return child.Interpret(cc)
+				}
+			}
+		}
+		if defaultCase != nil {
+			child := scope.NewChild()
+			return child.Interpret(defaultCase)
+		}
+		return nil, nil
+
+	case *ast.TypeSwitchStmt:
+		list := e.Body.List
+		var defaultCase *ast.CaseClause
+		var clauses []*ast.CaseClause
+		for _, stmt := range list {
+			cc := stmt.(*ast.CaseClause)
+			if cc.List == nil {
+				defaultCase = cc
+			} else {
+				clauses = append(clauses, cc)
+			}
+		}
+
+		currentScope := scope.NewChild()
+		if e.Init != nil {
+			if _, err := currentScope.Interpret(e.Init); err != nil {
+				return nil, err
+			}
+		}
+
+		var want reflect.Type
+		if e.Assign != nil {
+			_, err := currentScope.Interpret(e.Assign)
+			if err != nil {
+				return nil, err
+			}
+			want = currentScope.typeAssert
+		}
+
+		for _, cc := range clauses {
+			for _, c := range cc.List {
+				child := currentScope.NewChild()
+				out, err := child.Interpret(c)
+				if err != nil {
+					return nil, err
+				}
+				if out == want {
+					return child.Interpret(cc)
+				}
+			}
+		}
+		if defaultCase != nil {
+			child := scope.NewChild()
+			return child.Interpret(defaultCase)
+		}
+		return nil, nil
+
 	case *ast.CommClause:
 		return scope.Interpret(&ast.BlockStmt{List: e.Body})
+
+	case *ast.CaseClause:
+		return scope.Interpret(&ast.BlockStmt{List: e.Body})
+
+	case *ast.InterfaceType:
+		if len(e.Methods.List) > 0 {
+			return nil, fmt.Errorf("don't support non-anonymous interfaces yet")
+		}
+		return reflect.TypeOf(nil), nil
+
+	case *ast.TypeAssertExpr:
+		out, err := scope.Interpret(e.X)
+		if err != nil {
+			return nil, err
+		}
+		outType := reflect.TypeOf(out)
+		if e.Type == nil {
+			scope.typeAssert = outType
+			return out, nil
+		}
+		typ, err := scope.Interpret(e.Type)
+		if err != nil {
+			return nil, err
+		}
+		if typ != outType {
+			return nil, fmt.Errorf("%#v is not of type %#v, is %T", out, typ, out)
+		}
+		return out, nil
 
 	default:
 		return nil, fmt.Errorf("unknown node %#v", e)

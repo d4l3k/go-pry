@@ -808,6 +808,152 @@ func TestSelectMultiCase(t *testing.T) {
 	}
 }
 
+func TestSwitch(t *testing.T) {
+	t.Parallel()
+
+	scope := NewScope()
+
+	out, err := scope.InterpretString(`
+	a := 10
+	out := 0
+	switch a {
+	case 10:
+		out = 1
+	default:
+		out = 2
+	}
+	out
+	`)
+	if err != nil {
+		t.Error(err)
+	}
+	expected := 1
+	if !reflect.DeepEqual(expected, out) {
+		t.Errorf("Expected %#v got %#v.", expected, out)
+	}
+}
+
+func TestSwitchDefault(t *testing.T) {
+	t.Parallel()
+
+	scope := NewScope()
+
+	out, err := scope.InterpretString(`
+	a := 0
+	out := 0
+	switch a {
+	case 10:
+		out = 1
+	default:
+		out = 2
+	}
+	out
+	`)
+	if err != nil {
+		t.Error(err)
+	}
+	expected := 2
+	if !reflect.DeepEqual(expected, out) {
+		t.Errorf("Expected %#v got %#v.", expected, out)
+	}
+}
+
+func TestSwitchBool(t *testing.T) {
+	t.Parallel()
+
+	scope := NewScope()
+
+	out, err := scope.InterpretString(`
+	out := 0
+	switch {
+	case true:
+		out = 1
+	}
+	out
+	`)
+	if err != nil {
+		t.Error(err)
+	}
+	expected := 1
+	if !reflect.DeepEqual(expected, out) {
+		t.Errorf("Expected %#v got %#v.", expected, out)
+	}
+}
+
+func TestSwitchType(t *testing.T) {
+	t.Parallel()
+
+	scope := NewScope()
+
+	out, err := scope.InterpretString(`
+	out := 0
+	var t interface{}
+	t = 10
+	switch t.(type){
+	case int:
+		out = 1
+	case bool:
+		out = 2
+	}
+	out
+	`)
+	if err != nil {
+		t.Error(err)
+	}
+	expected := 1
+	if !reflect.DeepEqual(expected, out) {
+		t.Errorf("Expected %#v got %#v.", expected, out)
+	}
+}
+
+func TestSwitchTypeUse(t *testing.T) {
+	t.Parallel()
+
+	scope := NewScope()
+
+	out, err := scope.InterpretString(`
+	out := 0
+	var t interface{}
+	t = 10
+	switch t := t.(type){
+	case int:
+		out = t
+	case bool:
+		out = 2
+	}
+	out
+	`)
+	if err != nil {
+		t.Error(err)
+	}
+	expected := 10
+	if !reflect.DeepEqual(expected, out) {
+		t.Errorf("Expected %#v got %#v.", expected, out)
+	}
+}
+
+func TestSwitchNone(t *testing.T) {
+	t.Parallel()
+
+	scope := NewScope()
+
+	out, err := scope.InterpretString(`
+	out := 0
+	switch {
+	case false:
+		out = 1
+	}
+	out
+	`)
+	if err != nil {
+		t.Error(err)
+	}
+	expected := 0
+	if !reflect.DeepEqual(expected, out) {
+		t.Errorf("Expected %#v got %#v.", expected, out)
+	}
+}
+
 // TODO Packages
 
 // TODO References
