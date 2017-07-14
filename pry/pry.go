@@ -21,7 +21,12 @@ var (
 	tty *gotty.TTY
 )
 
-func init() {
+// Pry does nothing. It only exists so running code without go-pry doesn't throw an error.
+func Pry(v ...interface{}) {
+}
+
+// Apply drops into a pry shell in the location required.
+func Apply(scope *Scope) {
 	if runtime.GOOS == "windows" {
 		out = colorable.NewColorableStdout()
 	}
@@ -30,14 +35,8 @@ func init() {
 	if err != nil {
 		panic(err)
 	}
-}
+	defer tty.Close()
 
-// Pry does nothing. It only exists so running code without go-pry doesn't throw an error.
-func Pry(v ...interface{}) {
-}
-
-// Apply drops into a pry shell in the location required.
-func Apply(scope *Scope) {
 	if scope.Files == nil {
 		scope.Files = map[string]*ast.File{}
 	}
@@ -45,8 +44,7 @@ func Apply(scope *Scope) {
 	_, filePathRaw, lineNum, _ := runtime.Caller(1)
 	filePath := filepath.Dir(filePathRaw) + "/." + filepath.Base(filePathRaw) + "pry"
 
-	err := scope.ConfigureTypes(filePath, lineNum)
-	if err != nil {
+	if err := scope.ConfigureTypes(filePath, lineNum); err != nil {
 		panic(err)
 	}
 
@@ -189,7 +187,7 @@ func Apply(scope *Scope) {
 			index = 0
 		case 4: // Ctrl-D
 			fmt.Fprintln(out)
-			os.Exit(0)
+			return
 		}
 	}
 }
