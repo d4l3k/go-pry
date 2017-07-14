@@ -11,11 +11,24 @@ import (
 	"reflect"
 	"strconv"
 	"strings"
+	"sync"
+	"time"
 
 	"github.com/pkg/errors"
 
 	"go/types"
 	// Used by types for import determination
+)
+
+var (
+	// ErrChanSendFailed occurs when a channel is full or there are no receivers
+	// available.
+	ErrChanSendFailed = errors.New("failed to send, channel full or no receivers")
+
+	// ErrBranchBreak is an internal error thrown when a for loop breaks.
+	ErrBranchBreak = errors.New("branch break")
+	// ErrBranchContinue is an internal error thrown when a for loop continues.
+	ErrBranchContinue = errors.New("branch continue")
 )
 
 // Scope is a string-interface key-value pair that represents variables/functions in scope.
@@ -27,6 +40,11 @@ type Scope struct {
 	path   string
 	line   int
 	fset   *token.FileSet
+
+	isSelect   bool
+	typeAssert reflect.Type
+
+	sync.Mutex
 }
 
 // NewScope creates a new initialized scope
@@ -43,7 +61,9 @@ func NewScope() *Scope {
 func (scope *Scope) Get(name string) (val interface{}, exists bool) {
 	currentScope := scope
 	for !exists && currentScope != nil {
+		currentScope.Lock()
 		val, exists = currentScope.Vals[name]
+		currentScope.Unlock()
 		currentScope = currentScope.Parent
 	}
 	return
@@ -54,14 +74,18 @@ func (scope *Scope) Set(name string, val interface{}) {
 	exists := false
 	currentScope := scope
 	for !exists && currentScope != nil {
+		currentScope.Lock()
 		_, exists = currentScope.Vals[name]
 		if exists {
 			currentScope.Vals[name] = val
 		}
+		currentScope.Unlock()
 		currentScope = currentScope.Parent
 	}
 	if !exists {
+		scope.Lock()
 		scope.Vals[name] = val
+		scope.Unlock()
 	}
 }
 
@@ -69,9 +93,11 @@ func (scope *Scope) Set(name string, val interface{}) {
 func (scope *Scope) Keys() (keys []string) {
 	currentScope := scope
 	for currentScope != nil {
+		currentScope.Lock()
 		for k := range currentScope.Vals {
 			keys = append(keys, k)
 		}
+		currentScope.Unlock()
 		currentScope = scope.Parent
 	}
 	return
@@ -131,6 +157,7 @@ func (scope *Scope) Interpret(expr ast.Node) (interface{}, error) {
 		"append": Append,
 		"make":   Make,
 		"len":    Len,
+		"close":  Close,
 	}
 
 	switch e := expr.(type) {
@@ -217,6 +244,15 @@ func (scope *Scope) Interpret(expr ast.Node) (interface{}, error) {
 		err, _ = values[1].(error)
 		return values[0], err
 
+	case *ast.GoStmt:
+		go func() {
+			_, err := scope.NewChild().Interpret(e.Call)
+			if err != nil {
+				fmt.Fprintf(out, "goroutine failed: %s\n", err)
+			}
+		}()
+		return nil, nil
+
 	case *ast.BasicLit:
 		switch e.Kind {
 		case token.INT:
@@ -292,7 +328,7 @@ func (scope *Scope) Interpret(expr ast.Node) (interface{}, error) {
 		if err != nil {
 			return nil, err
 		}
-		return ComputeUnaryOp(x, e.Op)
+		return scope.ComputeUnaryOp(x, e.Op)
 
 	case *ast.ArrayType:
 		typ, err := scope.Interpret(e.Elt)
@@ -542,7 +578,10 @@ func (scope *Scope) Interpret(expr ast.Node) (interface{}, error) {
 		if err != nil {
 			return nil, err
 		}
-		zero := reflect.Zero(typ.(reflect.Type)).Interface()
+		var zero interface{}
+		if typ != nil {
+			zero = reflect.Zero(typ.(reflect.Type)).Interface()
+		}
 		for i, name := range e.Names {
 			if len(e.Values) > i {
 				v, err := scope.Interpret(e.Values[i])
@@ -557,28 +596,228 @@ func (scope *Scope) Interpret(expr ast.Node) (interface{}, error) {
 		return nil, nil
 	case *ast.ForStmt:
 		s := scope.NewChild()
-		if _, err := s.Interpret(e.Init); err != nil {
-			return nil, err
+		if e.Init != nil {
+			if _, err := s.Interpret(e.Init); err != nil {
+				return nil, err
+			}
 		}
+		var err error
 		var last interface{}
 		for {
-			cond, err := s.Interpret(e.Cond)
-			if err != nil {
-				return nil, err
+			if e.Cond != nil {
+				cond, err := s.Interpret(e.Cond)
+				if err != nil {
+					return nil, err
+				}
+				if cont, ok := cond.(bool); !ok {
+					return nil, fmt.Errorf("for loop requires a boolean condition not %#v", cond)
+				} else if !cont {
+					return last, nil
+				}
 			}
-			if cont, ok := cond.(bool); !ok {
-				return nil, fmt.Errorf("for loop requires a boolean condition not %#v", cond)
-			} else if !cont {
-				return last, nil
-			}
+
 			last, err = s.Interpret(e.Body)
-			if err != nil {
+			if err == ErrBranchBreak {
+				break
+			} else if err != nil && err != ErrBranchContinue {
 				return nil, err
 			}
-			if _, err := s.Interpret(e.Post); err != nil {
+
+			if e.Post != nil {
+				if _, err := s.Interpret(e.Post); err != nil {
+					return nil, err
+				}
+			}
+		}
+		return last, nil
+
+	case *ast.BranchStmt:
+		switch e.Tok {
+		case token.BREAK:
+			return nil, ErrBranchBreak
+		case token.CONTINUE:
+			return nil, ErrBranchContinue
+		default:
+			return nil, fmt.Errorf("unsupported BranchStmt %#v", e)
+		}
+
+	case *ast.SendStmt:
+		val, err := scope.Interpret(e.Value)
+		if err != nil {
+			return nil, err
+		}
+		channel, err := scope.Interpret(e.Chan)
+		if err != nil {
+			return nil, err
+		}
+		succeeded := reflect.ValueOf(channel).TrySend(reflect.ValueOf(val))
+		if !succeeded {
+			return nil, ErrChanSendFailed
+		}
+		return nil, nil
+
+	case *ast.SelectStmt:
+		list := e.Body.List
+		var defaultCase *ast.CommClause
+
+		// We're using a map here since we want iteration on clauses to be
+		// pseudo-random.
+		clauses := map[int]*ast.CommClause{}
+		for i, stmt := range list {
+			cc := stmt.(*ast.CommClause)
+			if cc.Comm == nil {
+				defaultCase = cc
+			} else {
+				clauses[i] = cc
+			}
+		}
+
+		for {
+			for _, cc := range clauses {
+				child := scope.NewChild()
+				child.isSelect = true
+				_, err := child.Interpret(cc.Comm)
+				child.isSelect = false
+				if err == ErrChanSendFailed || err == ErrBranchContinue || err == ErrChanRecvInSelect {
+					continue
+				} else if err != nil {
+					return nil, err
+				}
+				return child.Interpret(cc)
+			}
+			if defaultCase != nil {
+				child := scope.NewChild()
+				return child.Interpret(defaultCase)
+			}
+			time.Sleep(10 * time.Millisecond)
+		}
+
+	case *ast.SwitchStmt:
+		list := e.Body.List
+		var defaultCase *ast.CaseClause
+		var clauses []*ast.CaseClause
+		for _, stmt := range list {
+			cc := stmt.(*ast.CaseClause)
+			if cc.List == nil {
+				defaultCase = cc
+			} else {
+				clauses = append(clauses, cc)
+			}
+		}
+
+		currentScope := scope.NewChild()
+		if e.Init != nil {
+			if _, err := currentScope.Interpret(e.Init); err != nil {
 				return nil, err
 			}
 		}
+
+		var err error
+		var want interface{}
+		if e.Tag != nil {
+			want, err = currentScope.Interpret(e.Tag)
+		} else {
+			want = true
+		}
+		if err != nil {
+			return nil, err
+		}
+
+		for _, cc := range clauses {
+			for _, c := range cc.List {
+				child := currentScope.NewChild()
+				out, err := child.Interpret(c)
+				if err != nil {
+					return nil, err
+				}
+				if reflect.DeepEqual(out, want) {
+					return child.Interpret(cc)
+				}
+			}
+		}
+		if defaultCase != nil {
+			child := scope.NewChild()
+			return child.Interpret(defaultCase)
+		}
+		return nil, nil
+
+	case *ast.TypeSwitchStmt:
+		list := e.Body.List
+		var defaultCase *ast.CaseClause
+		var clauses []*ast.CaseClause
+		for _, stmt := range list {
+			cc := stmt.(*ast.CaseClause)
+			if cc.List == nil {
+				defaultCase = cc
+			} else {
+				clauses = append(clauses, cc)
+			}
+		}
+
+		currentScope := scope.NewChild()
+		if e.Init != nil {
+			if _, err := currentScope.Interpret(e.Init); err != nil {
+				return nil, err
+			}
+		}
+
+		var want reflect.Type
+		if e.Assign != nil {
+			_, err := currentScope.Interpret(e.Assign)
+			if err != nil {
+				return nil, err
+			}
+			want = currentScope.typeAssert
+		}
+
+		for _, cc := range clauses {
+			for _, c := range cc.List {
+				child := currentScope.NewChild()
+				out, err := child.Interpret(c)
+				if err != nil {
+					return nil, err
+				}
+				if out == want {
+					return child.Interpret(cc)
+				}
+			}
+		}
+		if defaultCase != nil {
+			child := scope.NewChild()
+			return child.Interpret(defaultCase)
+		}
+		return nil, nil
+
+	case *ast.CommClause:
+		return scope.Interpret(&ast.BlockStmt{List: e.Body})
+
+	case *ast.CaseClause:
+		return scope.Interpret(&ast.BlockStmt{List: e.Body})
+
+	case *ast.InterfaceType:
+		if len(e.Methods.List) > 0 {
+			return nil, fmt.Errorf("don't support non-anonymous interfaces yet")
+		}
+		return reflect.TypeOf(nil), nil
+
+	case *ast.TypeAssertExpr:
+		out, err := scope.Interpret(e.X)
+		if err != nil {
+			return nil, err
+		}
+		outType := reflect.TypeOf(out)
+		if e.Type == nil {
+			scope.typeAssert = outType
+			return out, nil
+		}
+		typ, err := scope.Interpret(e.Type)
+		if err != nil {
+			return nil, err
+		}
+		if typ != outType {
+			return nil, fmt.Errorf("%#v is not of type %#v, is %T", out, typ, out)
+		}
+		return out, nil
 
 	default:
 		return nil, fmt.Errorf("unknown node %#v", e)

@@ -65,6 +65,12 @@ func Make(t interface{}, args ...interface{}) (interface{}, error) {
 	}
 }
 
+// Close is a runtime replacement for the "close" function.
+func Close(t interface{}) (interface{}, error) {
+	reflect.ValueOf(t).Close()
+	return nil, nil
+}
+
 // Len is a runtime replacement for the len function
 func Len(t interface{}) (interface{}, error) {
 	return reflect.ValueOf(t).Len(), nil

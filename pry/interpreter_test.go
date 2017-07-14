@@ -600,6 +600,47 @@ func TestFuncDeclAndCall(t *testing.T) {
 	}
 }
 
+// Channels
+
+func TestChannel(t *testing.T) {
+	t.Parallel()
+
+	scope := NewScope()
+
+	out, err := scope.InterpretString("a := make(chan int, 10); a <- 1; a <- 2; []int{<-a, <-a}")
+	if err != nil {
+		t.Error(err)
+	}
+	expected := []int{1, 2}
+	if !reflect.DeepEqual(expected, out) {
+		t.Errorf("Expected %#v got %#v.", expected, out)
+	}
+}
+
+func TestChannelSendFail(t *testing.T) {
+	t.Parallel()
+
+	scope := NewScope()
+
+	_, out := scope.InterpretString("a := make(chan int); a <- 1")
+	expected := ErrChanSendFailed
+	if !reflect.DeepEqual(expected, out) {
+		t.Errorf("Expected err %#v got %#v.", expected, out)
+	}
+}
+
+func TestChannelRecvFail(t *testing.T) {
+	t.Parallel()
+
+	scope := NewScope()
+
+	_, out := scope.InterpretString("a := make(chan int); close(a); <-a")
+	expected := ErrChanRecvFailed
+	if !reflect.DeepEqual(expected, out) {
+		t.Errorf("Expected err %#v got %#v.", expected, out)
+	}
+}
+
 // Control structures
 
 func TestFor(t *testing.T) {
@@ -620,6 +661,40 @@ func TestFor(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
+	if !reflect.DeepEqual(expected, out) {
+		t.Errorf("Expected %#v got %#v.", expected, out)
+	}
+}
+
+func TestForBreak(t *testing.T) {
+	t.Parallel()
+
+	scope := NewScope()
+
+	_, err := scope.InterpretString("for { break }")
+	if err != nil {
+		t.Error(err)
+	}
+}
+
+func TestForContinue(t *testing.T) {
+	t.Parallel()
+
+	scope := NewScope()
+
+	out, err := scope.InterpretString(`
+	a := 0
+	for i:=0; i < 1; i++ {
+		a = 1
+		continue
+		a = 2
+	}
+	a
+	`)
+	if err != nil {
+		t.Error(err)
+	}
+	expected := 1
 	if !reflect.DeepEqual(expected, out) {
 		t.Errorf("Expected %#v got %#v.", expected, out)
 	}
@@ -650,6 +725,230 @@ func TestForRangeMap(t *testing.T) {
 		t.Error(err)
 	}
 	expected := 1 + 0 + 1 + 2 + 1 + 2 + 3
+	if !reflect.DeepEqual(expected, out) {
+		t.Errorf("Expected %#v got %#v.", expected, out)
+	}
+}
+
+func TestSelectDefault(t *testing.T) {
+	t.Parallel()
+
+	scope := NewScope()
+
+	out, err := scope.InterpretString(`
+	a := 0
+	c := make(chan int)
+	select {
+	case b := <-c:
+		a = b
+	default:
+		a = 1
+	}
+	a
+	`)
+	if err != nil {
+		t.Error(err)
+	}
+	expected := 1
+	if !reflect.DeepEqual(expected, out) {
+		t.Errorf("Expected %#v got %#v.", expected, out)
+	}
+}
+
+func TestSelect(t *testing.T) {
+	t.Parallel()
+
+	scope := NewScope()
+
+	out, err := scope.InterpretString(`
+	a := 0
+	c := make(chan int, 10)
+	c <- 2
+	select {
+	case b := <-c:
+		a = b
+	default:
+		a = 1
+	}
+	a
+	`)
+	if err != nil {
+		t.Error(err)
+	}
+	expected := 2
+	if !reflect.DeepEqual(expected, out) {
+		t.Errorf("Expected %#v got %#v.", expected, out)
+	}
+}
+
+func TestSelectMultiCase(t *testing.T) {
+	t.Parallel()
+
+	scope := NewScope()
+
+	out, err := scope.InterpretString(`
+	c := make(chan int, 10)
+	e := make(chan int, 10)
+	c <- 2
+	a := 0
+	select {
+	case d := <-e:
+		a = d
+	case b := <-c:
+		a = b
+	}
+	a
+	`)
+	if err != nil {
+		t.Error(err)
+	}
+	expected := 2
+	if !reflect.DeepEqual(expected, out) {
+		t.Errorf("Expected %#v got %#v.", expected, out)
+	}
+}
+
+func TestSwitch(t *testing.T) {
+	t.Parallel()
+
+	scope := NewScope()
+
+	out, err := scope.InterpretString(`
+	a := 10
+	out := 0
+	switch a {
+	case 10:
+		out = 1
+	default:
+		out = 2
+	}
+	out
+	`)
+	if err != nil {
+		t.Error(err)
+	}
+	expected := 1
+	if !reflect.DeepEqual(expected, out) {
+		t.Errorf("Expected %#v got %#v.", expected, out)
+	}
+}
+
+func TestSwitchDefault(t *testing.T) {
+	t.Parallel()
+
+	scope := NewScope()
+
+	out, err := scope.InterpretString(`
+	a := 0
+	out := 0
+	switch a {
+	case 10:
+		out = 1
+	default:
+		out = 2
+	}
+	out
+	`)
+	if err != nil {
+		t.Error(err)
+	}
+	expected := 2
+	if !reflect.DeepEqual(expected, out) {
+		t.Errorf("Expected %#v got %#v.", expected, out)
+	}
+}
+
+func TestSwitchBool(t *testing.T) {
+	t.Parallel()
+
+	scope := NewScope()
+
+	out, err := scope.InterpretString(`
+	out := 0
+	switch {
+	case true:
+		out = 1
+	}
+	out
+	`)
+	if err != nil {
+		t.Error(err)
+	}
+	expected := 1
+	if !reflect.DeepEqual(expected, out) {
+		t.Errorf("Expected %#v got %#v.", expected, out)
+	}
+}
+
+func TestSwitchType(t *testing.T) {
+	t.Parallel()
+
+	scope := NewScope()
+
+	out, err := scope.InterpretString(`
+	out := 0
+	var t interface{}
+	t = 10
+	switch t.(type){
+	case int:
+		out = 1
+	case bool:
+		out = 2
+	}
+	out
+	`)
+	if err != nil {
+		t.Error(err)
+	}
+	expected := 1
+	if !reflect.DeepEqual(expected, out) {
+		t.Errorf("Expected %#v got %#v.", expected, out)
+	}
+}
+
+func TestSwitchTypeUse(t *testing.T) {
+	t.Parallel()
+
+	scope := NewScope()
+
+	out, err := scope.InterpretString(`
+	out := 0
+	var t interface{}
+	t = 10
+	switch t := t.(type){
+	case int:
+		out = t
+	case bool:
+		out = 2
+	}
+	out
+	`)
+	if err != nil {
+		t.Error(err)
+	}
+	expected := 10
+	if !reflect.DeepEqual(expected, out) {
+		t.Errorf("Expected %#v got %#v.", expected, out)
+	}
+}
+
+func TestSwitchNone(t *testing.T) {
+	t.Parallel()
+
+	scope := NewScope()
+
+	out, err := scope.InterpretString(`
+	out := 0
+	switch {
+	case false:
+		out = 1
+	}
+	out
+	`)
+	if err != nil {
+		t.Error(err)
+	}
+	expected := 0
 	if !reflect.DeepEqual(expected, out) {
 		t.Errorf("Expected %#v got %#v.", expected, out)
 	}

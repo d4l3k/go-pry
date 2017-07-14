@@ -1,10 +1,18 @@
 package pry
 
 import (
+	"errors"
 	"fmt"
 	"go/token"
 	"reflect"
 )
+
+// ErrChanRecvFailed occurs when a channel is closed.
+var ErrChanRecvFailed = errors.New("receive failed: channel closed")
+
+// ErrChanRecvInSelect is an internal error that is used to indicate it's in a
+// select statement.
+var ErrChanRecvInSelect = errors.New("receive failed: in select")
 
 // ComputeBinaryOp executes the corresponding binary operation (+, -, etc) on two interfaces.
 func ComputeBinaryOp(xI, yI interface{}, op token.Token) (interface{}, error) {
@@ -586,7 +594,7 @@ func ComputeBinaryOp(xI, yI interface{}, op token.Token) (interface{}, error) {
 }
 
 // ComputeUnaryOp computes the corresponding unary (+x, -x) operation on an interface.
-func ComputeUnaryOp(xI interface{}, op token.Token) (interface{}, error) {
+func (scope *Scope) ComputeUnaryOp(xI interface{}, op token.Token) (interface{}, error) {
 	switch xI.(type) {
 	case bool:
 		x := xI.(bool)
@@ -715,5 +723,27 @@ func ComputeUnaryOp(xI interface{}, op token.Token) (interface{}, error) {
 			return -x, nil
 		}
 	}
+
+	switch reflect.TypeOf(xI).Kind() {
+	case reflect.Chan:
+		switch op {
+		case token.ARROW:
+			var v reflect.Value
+			var ok bool
+			if scope.isSelect {
+				v, ok = reflect.ValueOf(xI).TryRecv()
+				if !ok && !v.IsValid() {
+					return nil, ErrChanRecvInSelect
+				}
+			} else {
+				v, ok = reflect.ValueOf(xI).Recv()
+			}
+			if !ok {
+				return nil, ErrChanRecvFailed
+			}
+			return v.Interface(), nil
+		}
+	}
+
 	return nil, fmt.Errorf("unknown unary operation %#v on %#v", op, xI)
 }
