@@ -11,6 +11,7 @@ import (
 	"reflect"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/pkg/errors"
 
@@ -33,6 +34,8 @@ type Scope struct {
 	path   string
 	line   int
 	fset   *token.FileSet
+
+	sync.Mutex
 }
 
 // NewScope creates a new initialized scope
@@ -49,7 +52,9 @@ func NewScope() *Scope {
 func (scope *Scope) Get(name string) (val interface{}, exists bool) {
 	currentScope := scope
 	for !exists && currentScope != nil {
+		currentScope.Lock()
 		val, exists = currentScope.Vals[name]
+		currentScope.Unlock()
 		currentScope = currentScope.Parent
 	}
 	return
@@ -60,14 +65,18 @@ func (scope *Scope) Set(name string, val interface{}) {
 	exists := false
 	currentScope := scope
 	for !exists && currentScope != nil {
+		currentScope.Lock()
 		_, exists = currentScope.Vals[name]
 		if exists {
 			currentScope.Vals[name] = val
 		}
+		currentScope.Unlock()
 		currentScope = currentScope.Parent
 	}
 	if !exists {
+		scope.Lock()
 		scope.Vals[name] = val
+		scope.Unlock()
 	}
 }
 
@@ -75,9 +84,11 @@ func (scope *Scope) Set(name string, val interface{}) {
 func (scope *Scope) Keys() (keys []string) {
 	currentScope := scope
 	for currentScope != nil {
+		currentScope.Lock()
 		for k := range currentScope.Vals {
 			keys = append(keys, k)
 		}
+		currentScope.Unlock()
 		currentScope = scope.Parent
 	}
 	return
@@ -223,6 +234,15 @@ func (scope *Scope) Interpret(expr ast.Node) (interface{}, error) {
 		}
 		err, _ = values[1].(error)
 		return values[0], err
+
+	case *ast.GoStmt:
+		go func() {
+			_, err := scope.NewChild().Interpret(e.Call)
+			if err != nil {
+				fmt.Fprintf(out, "goroutine failed: %s\n", err)
+			}
+		}()
+		return nil, nil
 
 	case *ast.BasicLit:
 		switch e.Kind {
