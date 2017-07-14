@@ -100,6 +100,23 @@ func TestMapLiteral(t *testing.T) {
 	}
 }
 
+func TestMapLiteralInterface(t *testing.T) {
+	t.Parallel()
+
+	scope := NewScope()
+	out, err := scope.InterpretString("map[string]interface{}{\"duck\": 5,\n \"banana\": -123,\n}")
+	if err != nil {
+		t.Error(err)
+	}
+	expected := map[string]interface{}{
+		"duck":   5,
+		"banana": -123,
+	}
+	if !reflect.DeepEqual(expected, out) {
+		t.Errorf("Expected %#v got %#v.", expected, out)
+	}
+}
+
 func TestTypeCast(t *testing.T) {
 	t.Parallel()
 
@@ -476,6 +493,7 @@ func TestMakeSlice(t *testing.T) {
 		t.Errorf("Expected %#v got %#v.", expected, out)
 	}
 }
+
 func TestMakeChan(t *testing.T) {
 	t.Parallel()
 
@@ -489,6 +507,21 @@ func TestMakeChan(t *testing.T) {
 		t.Errorf("Expected %#v got %#v.", expected, out)
 	}
 }
+
+func TestMakeChanInterface(t *testing.T) {
+	t.Parallel()
+
+	scope := NewScope()
+	out, err := scope.InterpretString("make(chan interface{}, 10)")
+	if err != nil {
+		t.Error(err)
+	}
+	expected := make(chan interface{}, 10)
+	if reflect.TypeOf(expected) != reflect.TypeOf(out) {
+		t.Errorf("Expected %#v got %#v.", expected, out)
+	}
+}
+
 func TestMakeUnknown(t *testing.T) {
 	t.Parallel()
 

@@ -578,10 +578,7 @@ func (scope *Scope) Interpret(expr ast.Node) (interface{}, error) {
 		if err != nil {
 			return nil, err
 		}
-		var zero interface{}
-		if typ != nil {
-			zero = reflect.Zero(typ.(reflect.Type)).Interface()
-		}
+		zero := reflect.Zero(typ.(reflect.Type)).Interface()
 		for i, name := range e.Names {
 			if len(e.Values) > i {
 				v, err := scope.Interpret(e.Values[i])
@@ -798,7 +795,7 @@ func (scope *Scope) Interpret(expr ast.Node) (interface{}, error) {
 		if len(e.Methods.List) > 0 {
 			return nil, fmt.Errorf("don't support non-anonymous interfaces yet")
 		}
-		return reflect.TypeOf(nil), nil
+		return reflect.TypeOf((*interface{})(nil)).Elem(), nil
 
 	case *ast.TypeAssertExpr:
 		out, err := scope.Interpret(e.X)
