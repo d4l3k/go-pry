@@ -187,6 +187,9 @@ func Apply(scope *Scope) {
 			currentPos = count
 			line = ""
 			index = 0
+		case 4: // Ctrl-D
+			fmt.Fprintln(out)
+			os.Exit(0)
 		}
 	}
 }
