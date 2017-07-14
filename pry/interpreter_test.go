@@ -730,6 +730,84 @@ func TestForRangeMap(t *testing.T) {
 	}
 }
 
+func TestSelectDefault(t *testing.T) {
+	t.Parallel()
+
+	scope := NewScope()
+
+	out, err := scope.InterpretString(`
+	a := 0
+	c := make(chan int)
+	select {
+	case b := <-c:
+		a = b
+	default:
+		a = 1
+	}
+	a
+	`)
+	if err != nil {
+		t.Error(err)
+	}
+	expected := 1
+	if !reflect.DeepEqual(expected, out) {
+		t.Errorf("Expected %#v got %#v.", expected, out)
+	}
+}
+
+func TestSelect(t *testing.T) {
+	t.Parallel()
+
+	scope := NewScope()
+
+	out, err := scope.InterpretString(`
+	a := 0
+	c := make(chan int, 10)
+	c <- 2
+	select {
+	case b := <-c:
+		a = b
+	default:
+		a = 1
+	}
+	a
+	`)
+	if err != nil {
+		t.Error(err)
+	}
+	expected := 2
+	if !reflect.DeepEqual(expected, out) {
+		t.Errorf("Expected %#v got %#v.", expected, out)
+	}
+}
+
+func TestSelectMultiCase(t *testing.T) {
+	t.Parallel()
+
+	scope := NewScope()
+
+	out, err := scope.InterpretString(`
+	c := make(chan int, 10)
+	e := make(chan int, 10)
+	c <- 2
+	a := 0
+	select {
+	case d := <-e:
+		a = d
+	case b := <-c:
+		a = b
+	}
+	a
+	`)
+	if err != nil {
+		t.Error(err)
+	}
+	expected := 2
+	if !reflect.DeepEqual(expected, out) {
+		t.Errorf("Expected %#v got %#v.", expected, out)
+	}
+}
+
 // TODO Packages
 
 // TODO References

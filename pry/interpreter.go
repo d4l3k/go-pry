@@ -12,6 +12,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/pkg/errors"
 
@@ -39,6 +40,8 @@ type Scope struct {
 	path   string
 	line   int
 	fset   *token.FileSet
+
+	isSelect bool
 
 	sync.Mutex
 }
@@ -324,7 +327,7 @@ func (scope *Scope) Interpret(expr ast.Node) (interface{}, error) {
 		if err != nil {
 			return nil, err
 		}
-		return ComputeUnaryOp(x, e.Op)
+		return scope.ComputeUnaryOp(x, e.Op)
 
 	case *ast.ArrayType:
 		typ, err := scope.Interpret(e.Elt)
@@ -648,6 +651,45 @@ func (scope *Scope) Interpret(expr ast.Node) (interface{}, error) {
 			return nil, ErrChanSendFailed
 		}
 		return nil, nil
+
+	case *ast.SelectStmt:
+		list := e.Body.List
+		var defaultCase *ast.CommClause
+
+		// We're using a map here since we want iteration on clauses to be
+		// pseudo-random.
+		clauses := map[int]*ast.CommClause{}
+		for i, stmt := range list {
+			cc := stmt.(*ast.CommClause)
+			if cc.Comm == nil {
+				defaultCase = cc
+			} else {
+				clauses[i] = cc
+			}
+		}
+
+		for {
+			for _, cc := range clauses {
+				child := scope.NewChild()
+				child.isSelect = true
+				_, err := child.Interpret(cc.Comm)
+				child.isSelect = false
+				if err == ErrChanSendFailed || err == ErrBranchContinue || err == ErrChanRecvInSelect {
+					continue
+				} else if err != nil {
+					return nil, err
+				}
+				return child.Interpret(cc)
+			}
+			if defaultCase != nil {
+				child := scope.NewChild()
+				return child.Interpret(defaultCase)
+			}
+			time.Sleep(10 * time.Millisecond)
+		}
+
+	case *ast.CommClause:
+		return scope.Interpret(&ast.BlockStmt{List: e.Body})
 
 	default:
 		return nil, fmt.Errorf("unknown node %#v", e)
