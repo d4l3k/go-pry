@@ -18,6 +18,12 @@ import (
 	// Used by types for import determination
 )
 
+var (
+	// ErrChanSendFailed occurs when a channel is full or there are no receivers
+	// available.
+	ErrChanSendFailed = errors.New("failed to send, channel full or no receivers")
+)
+
 // Scope is a string-interface key-value pair that represents variables/functions in scope.
 type Scope struct {
 	Vals   map[string]interface{}
@@ -131,6 +137,7 @@ func (scope *Scope) Interpret(expr ast.Node) (interface{}, error) {
 		"append": Append,
 		"make":   Make,
 		"len":    Len,
+		"close":  Close,
 	}
 
 	switch e := expr.(type) {
@@ -579,6 +586,21 @@ func (scope *Scope) Interpret(expr ast.Node) (interface{}, error) {
 				return nil, err
 			}
 		}
+
+	case *ast.SendStmt:
+		val, err := scope.Interpret(e.Value)
+		if err != nil {
+			return nil, err
+		}
+		channel, err := scope.Interpret(e.Chan)
+		if err != nil {
+			return nil, err
+		}
+		succeeded := reflect.ValueOf(channel).TrySend(reflect.ValueOf(val))
+		if !succeeded {
+			return nil, ErrChanSendFailed
+		}
+		return nil, nil
 
 	default:
 		return nil, fmt.Errorf("unknown node %#v", e)

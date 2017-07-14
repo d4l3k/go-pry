@@ -600,6 +600,47 @@ func TestFuncDeclAndCall(t *testing.T) {
 	}
 }
 
+// Channels
+
+func TestChannel(t *testing.T) {
+	t.Parallel()
+
+	scope := NewScope()
+
+	out, err := scope.InterpretString("a := make(chan int, 10); a <- 1; a <- 2; []int{<-a, <-a}")
+	if err != nil {
+		t.Error(err)
+	}
+	expected := []int{1, 2}
+	if !reflect.DeepEqual(expected, out) {
+		t.Errorf("Expected %#v got %#v.", expected, out)
+	}
+}
+
+func TestChannelSendFail(t *testing.T) {
+	t.Parallel()
+
+	scope := NewScope()
+
+	_, out := scope.InterpretString("a := make(chan int); a <- 1")
+	expected := ErrChanSendFailed
+	if !reflect.DeepEqual(expected, out) {
+		t.Errorf("Expected err %#v got %#v.", expected, out)
+	}
+}
+
+func TestChannelRecvFail(t *testing.T) {
+	t.Parallel()
+
+	scope := NewScope()
+
+	_, out := scope.InterpretString("a := make(chan int); close(a); <-a")
+	expected := ErrChanRecvFailed
+	if !reflect.DeepEqual(expected, out) {
+		t.Errorf("Expected err %#v got %#v.", expected, out)
+	}
+}
+
 // Control structures
 
 func TestFor(t *testing.T) {

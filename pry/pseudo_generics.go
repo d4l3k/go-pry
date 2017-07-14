@@ -1,10 +1,14 @@
 package pry
 
 import (
+	"errors"
 	"fmt"
 	"go/token"
 	"reflect"
 )
+
+// ErrChanRecvFailed occurs when a channel is closed.
+var ErrChanRecvFailed = errors.New("receive failed: channel closed")
 
 // ComputeBinaryOp executes the corresponding binary operation (+, -, etc) on two interfaces.
 func ComputeBinaryOp(xI, yI interface{}, op token.Token) (interface{}, error) {
@@ -715,5 +719,18 @@ func ComputeUnaryOp(xI interface{}, op token.Token) (interface{}, error) {
 			return -x, nil
 		}
 	}
+
+	switch reflect.TypeOf(xI).Kind() {
+	case reflect.Chan:
+		switch op {
+		case token.ARROW:
+			v, ok := reflect.ValueOf(xI).Recv()
+			if !ok {
+				return nil, ErrChanRecvFailed
+			}
+			return v.Interface(), nil
+		}
+	}
+
 	return nil, fmt.Errorf("unknown unary operation %#v on %#v", op, xI)
 }
