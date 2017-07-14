@@ -23,6 +23,11 @@ var (
 	// ErrChanSendFailed occurs when a channel is full or there are no receivers
 	// available.
 	ErrChanSendFailed = errors.New("failed to send, channel full or no receivers")
+
+	// ErrBranchBreak is an internal error thrown when a for loop breaks.
+	ErrBranchBreak = errors.New("branch break")
+	// ErrBranchContinue is an internal error thrown when a for loop continues.
+	ErrBranchContinue = errors.New("branch continue")
 )
 
 // Scope is a string-interface key-value pair that represents variables/functions in scope.
@@ -584,27 +589,49 @@ func (scope *Scope) Interpret(expr ast.Node) (interface{}, error) {
 		return nil, nil
 	case *ast.ForStmt:
 		s := scope.NewChild()
-		if _, err := s.Interpret(e.Init); err != nil {
-			return nil, err
+		if e.Init != nil {
+			if _, err := s.Interpret(e.Init); err != nil {
+				return nil, err
+			}
 		}
+		var err error
 		var last interface{}
 		for {
-			cond, err := s.Interpret(e.Cond)
-			if err != nil {
-				return nil, err
+			if e.Cond != nil {
+				cond, err := s.Interpret(e.Cond)
+				if err != nil {
+					return nil, err
+				}
+				if cont, ok := cond.(bool); !ok {
+					return nil, fmt.Errorf("for loop requires a boolean condition not %#v", cond)
+				} else if !cont {
+					return last, nil
+				}
 			}
-			if cont, ok := cond.(bool); !ok {
-				return nil, fmt.Errorf("for loop requires a boolean condition not %#v", cond)
-			} else if !cont {
-				return last, nil
-			}
+
 			last, err = s.Interpret(e.Body)
-			if err != nil {
+			if err == ErrBranchBreak {
+				break
+			} else if err != nil && err != ErrBranchContinue {
 				return nil, err
 			}
-			if _, err := s.Interpret(e.Post); err != nil {
-				return nil, err
+
+			if e.Post != nil {
+				if _, err := s.Interpret(e.Post); err != nil {
+					return nil, err
+				}
 			}
+		}
+		return last, nil
+
+	case *ast.BranchStmt:
+		switch e.Tok {
+		case token.BREAK:
+			return nil, ErrBranchBreak
+		case token.CONTINUE:
+			return nil, ErrBranchContinue
+		default:
+			return nil, fmt.Errorf("unsupported BranchStmt %#v", e)
 		}
 
 	case *ast.SendStmt:

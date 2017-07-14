@@ -666,6 +666,40 @@ func TestFor(t *testing.T) {
 	}
 }
 
+func TestForBreak(t *testing.T) {
+	t.Parallel()
+
+	scope := NewScope()
+
+	_, err := scope.InterpretString("for { break }")
+	if err != nil {
+		t.Error(err)
+	}
+}
+
+func TestForContinue(t *testing.T) {
+	t.Parallel()
+
+	scope := NewScope()
+
+	out, err := scope.InterpretString(`
+	a := 0
+	for i:=0; i < 1; i++ {
+		a = 1
+		continue
+		a = 2
+	}
+	a
+	`)
+	if err != nil {
+		t.Error(err)
+	}
+	expected := 1
+	if !reflect.DeepEqual(expected, out) {
+		t.Errorf("Expected %#v got %#v.", expected, out)
+	}
+}
+
 func TestForRangeArray(t *testing.T) {
 	t.Parallel()
 
