@@ -954,6 +954,123 @@ func TestSwitchNone(t *testing.T) {
 	}
 }
 
+func TestIf(t *testing.T) {
+	t.Parallel()
+
+	scope := NewScope()
+
+	out, err := scope.InterpretString(`
+	a := 0
+	if true {
+		a = 1
+	} else {
+		a = 2
+	}
+	a
+	`)
+	if err != nil {
+		t.Error(err)
+	}
+	expected := 1
+	if !reflect.DeepEqual(expected, out) {
+		t.Errorf("Expected %#v got %#v.", expected, out)
+	}
+}
+
+func TestIfElse(t *testing.T) {
+	t.Parallel()
+
+	scope := NewScope()
+
+	out, err := scope.InterpretString(`
+	a := 0
+	if false {
+		a = 1
+	} else {
+		a = 2
+	}
+	a
+	`)
+	if err != nil {
+		t.Error(err)
+	}
+	expected := 2
+	if !reflect.DeepEqual(expected, out) {
+		t.Errorf("Expected %#v got %#v.", expected, out)
+	}
+}
+
+func TestIfIfElse(t *testing.T) {
+	t.Parallel()
+
+	scope := NewScope()
+
+	out, err := scope.InterpretString(`
+	a := 0
+	if false {
+		a = 1
+	} else if true {
+		a = 2
+	}
+	a
+	`)
+	if err != nil {
+		t.Error(err)
+	}
+	expected := 2
+	if !reflect.DeepEqual(expected, out) {
+		t.Errorf("Expected %#v got %#v.", expected, out)
+	}
+}
+
+func TestFunctionArgs(t *testing.T) {
+	t.Parallel()
+
+	scope := NewScope()
+
+	out, err := scope.InterpretString(`
+	f := func(b, c int) {
+		return b + c
+	}
+	f(10, 5)
+	`)
+	if err != nil {
+		t.Error(err)
+	}
+	expected := 15
+	if !reflect.DeepEqual(expected, out) {
+		t.Errorf("Expected %#v got %#v.", expected, out)
+	}
+}
+
+func TestDefer(t *testing.T) {
+	t.Parallel()
+
+	scope := NewScope()
+
+	out, err := scope.InterpretString(`
+	a :=  0
+	f := func() {
+		defer func() {
+			a = 2
+		}()
+		defer func() {
+			a = 3
+		}()
+		a = 1
+	}
+	f()
+	a
+	`)
+	if err != nil {
+		t.Error(err)
+	}
+	expected := 2
+	if !reflect.DeepEqual(expected, out) {
+		t.Errorf("Expected %#v got %#v.", expected, out)
+	}
+}
+
 // TODO Packages
 
 // TODO References
