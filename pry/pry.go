@@ -48,36 +48,7 @@ func Apply(scope *Scope) {
 		panic(err)
 	}
 
-	fmt.Fprintf(out, "\nFrom %s @ line %d :\n\n", filePathRaw, lineNum)
-	file, err := ioutil.ReadFile(filePath)
-	if err != nil {
-		fmt.Fprintln(out, err)
-	}
-	lines := strings.Split((string)(file), "\n")
-	lineNum--
-	start := lineNum - 5
-	if start < 0 {
-		start = 0
-	}
-	end := lineNum + 6
-	if end > len(lines) {
-		end = len(lines)
-	}
-	maxLen := len(fmt.Sprint(end))
-	for i := start; i < end; i++ {
-		caret := "  "
-		if i == lineNum {
-			caret = "=>"
-		}
-		numStr := fmt.Sprint(i + 1)
-		if len(numStr) < maxLen {
-			numStr = " " + numStr
-		}
-		num := ansi.Color(numStr, "blue+b")
-		highlightedLine := Highlight(strings.Replace(lines[i], "\t", "  ", -1))
-		fmt.Fprintf(out, " %s %s: %s\n", caret, num, highlightedLine)
-	}
-	fmt.Fprintln(out)
+	displayFilePosition(filePathRaw, filePath, lineNum)
 
 	history := []string{}
 	currentPos := 0
@@ -190,6 +161,39 @@ func Apply(scope *Scope) {
 			return
 		}
 	}
+}
+
+func displayFilePosition(filePathRaw, filePath string, lineNum int) {
+	fmt.Fprintf(out, "\nFrom %s @ line %d :\n\n", filePathRaw, lineNum)
+	file, err := ioutil.ReadFile(filePath)
+	if err != nil {
+		fmt.Fprintln(out, err)
+	}
+	lines := strings.Split((string)(file), "\n")
+	lineNum--
+	start := lineNum - 5
+	if start < 0 {
+		start = 0
+	}
+	end := lineNum + 6
+	if end > len(lines) {
+		end = len(lines)
+	}
+	maxLen := len(fmt.Sprint(end))
+	for i := start; i < end; i++ {
+		caret := "  "
+		if i == lineNum {
+			caret = "=>"
+		}
+		numStr := fmt.Sprint(i + 1)
+		if len(numStr) < maxLen {
+			numStr = " " + numStr
+		}
+		num := ansi.Color(numStr, "blue+b")
+		highlightedLine := Highlight(strings.Replace(lines[i], "\t", "  ", -1))
+		fmt.Fprintf(out, " %s %s: %s\n", caret, num, highlightedLine)
+	}
+	fmt.Fprintln(out)
 }
 
 // displaySuggestions renders the live autocomplete from GoCode.
