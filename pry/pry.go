@@ -119,7 +119,6 @@ func Apply(scope *Scope) {
 						line = history[currentPos]
 					}
 					index = len(line)
-					continue
 				case 65: // Up
 					currentPos--
 					if currentPos < 0 {
@@ -129,22 +128,19 @@ func Apply(scope *Scope) {
 						line = history[currentPos]
 					}
 					index = len(line)
-					continue
 				case 67: // Right
 					index++
 					if index > len(line) {
 						index = len(line)
 					}
-					continue
 				case 68: // Left
 					index--
 					if index < 0 {
 						index = 0
 					}
-					continue
 				}
+				continue
 			} else if bPrev == 51 && r == 126 { // DELETE
-				line = line[:index-1] + line[index:]
 				if len(line) > 0 && index < len(line) {
 					line = line[:index] + line[index+1:]
 				}
@@ -156,7 +152,7 @@ func Apply(scope *Scope) {
 			line = line[:index] + string(r) + line[index:]
 			index++
 		case 127, '\b': // Backspace
-			if len(line) > 0 {
+			if len(line) > 0 && index > 0 {
 				line = line[:index-1] + line[index:]
 				index--
 			}
