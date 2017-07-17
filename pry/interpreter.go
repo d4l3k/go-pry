@@ -847,6 +847,12 @@ func (scope *Scope) Interpret(expr ast.Node) (interface{}, error) {
 		})
 		return nil, nil
 
+	case *ast.StructType:
+		if len(e.Fields.List) > 0 {
+			return nil, errors.New("don't support non-empty structs yet")
+		}
+		return reflect.TypeOf(struct{}{}), nil
+
 	default:
 		return nil, fmt.Errorf("unknown node %#v", e)
 	}
