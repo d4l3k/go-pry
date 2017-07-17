@@ -43,8 +43,26 @@ type Scope struct {
 
 	isSelect   bool
 	typeAssert reflect.Type
+	isFunction bool
+	defers     []*Defer
 
 	sync.Mutex
+}
+
+type Defer struct {
+	fun       ast.Expr
+	scope     *Scope
+	arguments []interface{}
+}
+
+func (scope *Scope) Defer(d *Defer) error {
+	for ; scope != nil; scope = scope.Parent {
+		if scope.isFunction {
+			scope.defers = append(scope.defers, d)
+			return nil
+		}
+	}
+	return errors.New("defer: can't find function scope")
 }
 
 // NewScope creates a new initialized scope
@@ -211,38 +229,16 @@ func (scope *Scope) Interpret(expr ast.Node) (interface{}, error) {
 		return nil, fmt.Errorf("unknown field %#v", sel.Name)
 
 	case *ast.CallExpr:
-		fun, err := scope.Interpret(e.Fun)
-		if err != nil {
-			return nil, err
-		}
-
-		args := make([]reflect.Value, len(e.Args))
+		args := make([]interface{}, len(e.Args))
 		for i, arg := range e.Args {
 			interpretedArg, err := scope.Interpret(arg)
 			if err != nil {
 				return nil, err
 			}
-			args[i] = reflect.ValueOf(interpretedArg)
+			args[i] = interpretedArg
 		}
 
-		switch funV := fun.(type) {
-		case reflect.Type:
-			return args[0].Convert(funV).Interface(), nil
-		case *Func:
-			// TODO enforce func return values
-			return scope.Interpret(funV.Def.Body)
-		}
-
-		funVal := reflect.ValueOf(fun)
-
-		values := ValuesToInterfaces(funVal.Call(args))
-		if len(values) == 0 {
-			return nil, nil
-		} else if len(values) == 1 {
-			return values[0], nil
-		}
-		err, _ = values[1].(error)
-		return values[0], err
+		return scope.ExecuteFunc(e.Fun, args)
 
 	case *ast.GoStmt:
 		go func() {
@@ -816,9 +812,96 @@ func (scope *Scope) Interpret(expr ast.Node) (interface{}, error) {
 		}
 		return out, nil
 
+	case *ast.IfStmt:
+		currentScope := scope.NewChild()
+		if e.Init != nil {
+			if _, err := currentScope.Interpret(e.Init); err != nil {
+				return nil, err
+			}
+		}
+		cond, err := currentScope.Interpret(e.Cond)
+		if err != nil {
+			return nil, err
+		}
+		if cond == true {
+			return currentScope.Interpret(e.Body)
+		}
+		return currentScope.Interpret(e.Else)
+
+	case *ast.DeferStmt:
+		var args []interface{}
+		for _, arg := range e.Call.Args {
+			v, err := scope.Interpret(arg)
+			if err != nil {
+				return nil, err
+			}
+			args = append(args, v)
+		}
+		scope.Defer(&Defer{
+			fun:       e.Call.Fun,
+			scope:     scope,
+			arguments: args,
+		})
+		return nil, nil
+
+	case *ast.StructType:
+		if len(e.Fields.List) > 0 {
+			return nil, errors.New("don't support non-empty structs yet")
+		}
+		return reflect.TypeOf(struct{}{}), nil
+
 	default:
 		return nil, fmt.Errorf("unknown node %#v", e)
 	}
+}
+
+func (scope *Scope) ExecuteFunc(funExpr ast.Expr, args []interface{}) (interface{}, error) {
+	fun, err := scope.Interpret(funExpr)
+	if err != nil {
+		return nil, err
+	}
+
+	switch funV := fun.(type) {
+	case reflect.Type:
+		return reflect.ValueOf(args[0]).Convert(funV).Interface(), nil
+	case *Func:
+		// TODO enforce func return values
+		currentScope := scope.NewChild()
+		i := 0
+		for _, arg := range funV.Def.Type.Params.List {
+			for _, name := range arg.Names {
+				currentScope.Set(name.Name, args[i])
+				i++
+			}
+		}
+		currentScope.isFunction = true
+		ret, err := currentScope.Interpret(funV.Def.Body)
+		if err != nil {
+			return nil, err
+		}
+		for i := len(currentScope.defers) - 1; i >= 0; i-- {
+			d := currentScope.defers[i]
+			if _, err := d.scope.ExecuteFunc(d.fun, d.arguments); err != nil {
+				return nil, err
+			}
+		}
+		return ret, nil
+	}
+
+	funVal := reflect.ValueOf(fun)
+
+	var valueArgs []reflect.Value
+	for _, v := range args {
+		valueArgs = append(valueArgs, reflect.ValueOf(v))
+	}
+	values := ValuesToInterfaces(funVal.Call(valueArgs))
+	if len(values) == 0 {
+		return nil, nil
+	} else if len(values) == 1 {
+		return values[0], nil
+	}
+	err, _ = values[1].(error)
+	return values[0], err
 }
 
 // ConfigureTypes configures the scope type checker
