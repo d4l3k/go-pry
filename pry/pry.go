@@ -1,10 +1,13 @@
 package pry
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"io/ioutil"
+	"log"
 	"os"
+	"path"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -14,12 +17,56 @@ import (
 	"github.com/mattn/go-colorable"
 	gotty "github.com/mattn/go-tty"
 	"github.com/mgutz/ansi"
+	homedir "github.com/mitchellh/go-homedir"
 )
 
 var (
 	out io.Writer = os.Stdout
 	tty *gotty.TTY
 )
+
+var historyFile = ".go-pry_history"
+
+func historyPath() (string, error) {
+	dir, err := homedir.Dir()
+	if err != nil {
+		return "", err
+	}
+	return path.Join(dir, historyFile), nil
+}
+
+func loadHistory() []string {
+	path, err := historyPath()
+	if err != nil {
+		log.Printf("Error finding user home dir: %s", err)
+		return nil
+	}
+	body, err := ioutil.ReadFile(path)
+	if err != nil {
+		return nil
+	}
+	var history []string
+	if err := json.Unmarshal(body, &history); err != nil {
+		log.Printf("Error reading history file! %s", err)
+		return nil
+	}
+	return history
+}
+
+func saveHistory(history *[]string) {
+	body, err := json.Marshal(history)
+	if err != nil {
+		log.Printf("Err marshalling history: %s", err)
+	}
+	path, err := historyPath()
+	if err != nil {
+		log.Printf("Error finding user home dir: %s", err)
+		return
+	}
+	if err := ioutil.WriteFile(path, body, 0755); err != nil {
+		log.Printf("Error writing history: %s", err)
+	}
+}
 
 // Pry does nothing. It only exists so running code without go-pry doesn't throw an error.
 func Pry(v ...interface{}) {
@@ -50,8 +97,10 @@ func Apply(scope *Scope) {
 
 	displayFilePosition(filePathRaw, filePath, lineNum)
 
-	history := []string{}
-	currentPos := 0
+	history := loadHistory()
+	defer saveHistory(&history)
+
+	currentPos := len(history)
 
 	line := ""
 	count := 0
