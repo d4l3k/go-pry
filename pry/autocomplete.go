@@ -19,7 +19,10 @@ func (scope *Scope) SuggestionsGoCode(line string, index int) ([]string, error) 
 	var suggestions []string
 	var code string
 	for name, file := range scope.Files {
-		name = filepath.Dir(name) + "/." + filepath.Base(name) + "pry"
+		moddedName := filepath.Dir(name) + "/." + filepath.Base(name) + "pry"
+		if scope.path == moddedName {
+			name = moddedName
+		}
 		if name == scope.path {
 			ast.Walk(walker(func(n ast.Node) bool {
 				switch s := n.(type) {
