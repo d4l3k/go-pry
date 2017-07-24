@@ -244,7 +244,7 @@ func (scope *Scope) Interpret(expr ast.Node) (interface{}, error) {
 		go func() {
 			_, err := scope.NewChild().Interpret(e.Call)
 			if err != nil {
-				fmt.Fprintf(out, "goroutine failed: %s\n", err)
+				fmt.Printf("goroutine failed: %s\n", err)
 			}
 		}()
 		return nil, nil

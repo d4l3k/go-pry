@@ -20,11 +20,6 @@ import (
 	homedir "github.com/mitchellh/go-homedir"
 )
 
-var (
-	out io.Writer = os.Stdout
-	tty *gotty.TTY
-)
-
 var historyFile = ".go-pry_history"
 
 func historyPath() (string, error) {
@@ -74,28 +69,45 @@ func Pry(v ...interface{}) {
 
 // Apply drops into a pry shell in the location required.
 func Apply(scope *Scope) {
+	var out io.Writer = os.Stdout
 	if runtime.GOOS == "windows" {
 		out = colorable.NewColorableStdout()
 	}
-	var err error
-	tty, err = gotty.Open()
+	tty, err := gotty.Open()
 	if err != nil {
 		panic(err)
 	}
 	defer tty.Close()
 
+	_, filePathRaw, lineNum, _ := runtime.Caller(1)
+	filePath := filepath.Dir(filePathRaw) + "/." + filepath.Base(filePathRaw) + "pry"
+
+	if err := apply(scope, out, tty, filePath, filePathRaw, lineNum); err != nil {
+		panic(err)
+	}
+}
+
+type genericTTY interface {
+	ReadRune() (rune, error)
+	Size() (int, int, error)
+}
+
+func apply(
+	scope *Scope,
+	out io.Writer,
+	tty genericTTY,
+	filePath, filePathRaw string,
+	lineNum int,
+) error {
 	if scope.Files == nil {
 		scope.Files = map[string]*ast.File{}
 	}
 
-	_, filePathRaw, lineNum, _ := runtime.Caller(1)
-	filePath := filepath.Dir(filePathRaw) + "/." + filepath.Base(filePathRaw) + "pry"
-
 	if err := scope.ConfigureTypes(filePath, lineNum); err != nil {
-		panic(err)
+		return err
 	}
 
-	displayFilePosition(filePathRaw, filePath, lineNum)
+	displayFilePosition(out, filePathRaw, filePath, lineNum)
 
 	history := loadHistory()
 	defer saveHistory(&history)
@@ -103,7 +115,7 @@ func Apply(scope *Scope) {
 	currentPos := len(history)
 
 	line := ""
-	count := 0
+	count := len(history)
 	index := 0
 	r := rune(0)
 	for {
@@ -111,15 +123,16 @@ func Apply(scope *Scope) {
 		fmt.Fprintf(out, "\r\033[K%s%s \033[0J\033[%dD", prompt, Highlight(line), len(line)-index+1)
 
 		promptWidth := len(prompt) + index
-		displaySuggestions(scope, line, index, promptWidth)
+		displaySuggestions(scope, out, tty, line, index, promptWidth)
 
 		bPrev := r
 
 		r = 0
 		for r == 0 {
+			var err error
 			r, err = tty.ReadRune()
 			if err != nil {
-				panic(err)
+				return err
 			}
 		}
 		switch r {
@@ -187,7 +200,7 @@ func Apply(scope *Scope) {
 				continue
 			}
 			if line == "continue" || line == "exit" {
-				return
+				return nil
 			}
 			resp, err := scope.InterpretString(line)
 			if err != nil {
@@ -203,12 +216,14 @@ func Apply(scope *Scope) {
 			index = 0
 		case 4: // Ctrl-D
 			fmt.Fprintln(out)
-			return
+			return nil
 		}
 	}
 }
 
-func displayFilePosition(filePathRaw, filePath string, lineNum int) {
+func displayFilePosition(
+	out io.Writer, filePathRaw, filePath string, lineNum int,
+) {
 	fmt.Fprintf(out, "\nFrom %s @ line %d :\n\n", filePathRaw, lineNum)
 	file, err := ioutil.ReadFile(filePath)
 	if err != nil {
@@ -242,7 +257,13 @@ func displayFilePosition(filePathRaw, filePath string, lineNum int) {
 }
 
 // displaySuggestions renders the live autocomplete from GoCode.
-func displaySuggestions(scope *Scope, line string, index, promptWidth int) {
+func displaySuggestions(
+	scope *Scope,
+	out io.Writer,
+	tty genericTTY,
+	line string,
+	index, promptWidth int,
+) {
 	// Suggestions
 	suggestions, err := scope.SuggestionsGoCode(line, index)
 	if err != nil {
