@@ -71,12 +71,12 @@ func InjectPry(filePath string) (string, error) {
 			if err != nil {
 				panic(err)
 			}
-			pair := "\"" + importName + "\": pry.Package{Name: \"" + pkg.Name + "\", Functions: map[string]interface{}{"
+			pair := fmt.Sprintf(`"%s": pry.Package{Name: "%s", Functions: map[string]interface{}{`, importName, pkg.Name)
 			added := make(map[string]bool)
 			for _, nPkg := range pkgAst {
 				pair += GetExports(importName, nPkg, added)
 			}
-			pair += "}}, "
+			pair = fmt.Sprintf("%s}}, ", pair)
 			packagePairs = append(packagePairs, pair)
 		}
 	}
@@ -118,11 +118,10 @@ func InjectPry(filePath string) (string, error) {
 		filteredVars := filterVars(context.Vars)
 		obj := "&pry.Scope{Vals:map[string]interface{}{ "
 		for _, v := range filteredVars {
-			obj += "\"" + v + "\": " + v + ", "
+			obj = fmt.Sprintf(`%s"%s": %s, `, obj, v, v)
 		}
-		obj += strings.Join(packagePairs, "")
-		obj += "}}"
-		text := "pry.Apply(" + obj + ")"
+		obj = fmt.Sprintf(`%s%s}}`, obj, strings.Join(packagePairs, ""))
+		text := fmt.Sprintf("pry.Apply(%s)", obj)
 		fileText = fileText[0:context.Start+offset] + text + fileText[context.End+offset:]
 		offset = len(text) - (context.End - context.Start)
 	}
