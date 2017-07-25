@@ -12,6 +12,7 @@ import (
 	"os"
 	"os/exec"
 	"os/signal"
+	"path"
 	"path/filepath"
 	"reflect"
 	"strings"
@@ -306,6 +307,14 @@ func GetExports(importName string, pkg *ast.Package, added map[string]bool) stri
 	vars := ""
 	for name, file := range pkg.Files {
 		if strings.HasSuffix(name, "_test.go") {
+			continue
+		}
+
+		match, err := build.Default.MatchFile(path.Dir(name), path.Base(name))
+		if err != nil {
+			panic(err)
+		}
+		if !match {
 			continue
 		}
 
