@@ -17,7 +17,7 @@ before_install:
   - go get github.com/mattn/goveralls
 
 script:
-  - go test -v -coverprofile=pry.coverprofile ./pry
-  - go test -v -coverprofile=main.coverprofile
+  - go test -v -race -coverprofile=pry.coverprofile ./pry
+  - go test -v -race -coverprofile=main.coverprofile
   - $HOME/gopath/bin/gover
   - $HOME/gopath/bin/goveralls -service=travis-ci -coverprofile=gover.coverprofile
