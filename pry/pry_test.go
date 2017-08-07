@@ -17,7 +17,6 @@ import (
 )
 
 func TestHistory(t *testing.T) {
-	t.Parallel()
 	rand.Seed(time.Now().UnixNano())
 
 	historyFile = ".go-pry_history_test"
