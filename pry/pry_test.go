@@ -1,7 +1,6 @@
 package pry
 
 import (
-	"bytes"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -13,11 +12,11 @@ import (
 	"time"
 
 	"github.com/cenkalti/backoff"
+	"github.com/d4l3k/go-pry/pry/safebuffer"
 	"github.com/pkg/errors"
 )
 
 func TestHistory(t *testing.T) {
-	t.Parallel()
 	rand.Seed(time.Now().UnixNano())
 
 	historyFile = ".go-pry_history_test"
@@ -121,14 +120,14 @@ func (t *testTTY) Close() {
 }
 
 type testPryEnv struct {
-	stdout *bytes.Buffer
+	stdout *safebuffer.Buffer
 	*testTTY
 	*Scope
 	dir, file string
 }
 
 func testPryApply(t testing.TB) *testPryEnv {
-	var stdout bytes.Buffer
+	var stdout safebuffer.Buffer
 	tty := makeTestTTY()
 	scope := NewScope()
 

@@ -911,7 +911,7 @@ func (scope *Scope) ConfigureTypes(path string, line int) error {
 	scope.fset = token.NewFileSet() // positions are relative to fset
 	scope.config = &types.Config{
 		FakeImportC: true,
-		Importer:    gcImporter,
+		Importer:    getImporter(),
 	}
 
 	// Parse the file containing this very example
@@ -1018,6 +1018,8 @@ func (scope *Scope) TypeCheck() (*types.Info, []error) {
 	for _, f := range scope.Files {
 		files = append(files, f)
 	}
+	// Not checking errors here since they should be reported via the Error
+	// function above.
 	scope.config.Check(filepath.Dir(scope.path), scope.fset, files, info)
 	return info, errs
 }

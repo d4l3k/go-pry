@@ -2,6 +2,11 @@
 
 package pry
 
-import gcimporter "go/importer"
+import (
+	gcimporter "go/importer"
+	"go/types"
+)
 
-var gcImporter = gcimporter.Default()
+func getImporter() types.Importer {
+	return gcimporter.Default()
+}
