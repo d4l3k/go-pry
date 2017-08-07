@@ -8,9 +8,11 @@ import (
 	gcimporter "golang.org/x/tools/go/gcimporter15"
 )
 
-var gcImporter = importer{
-	impFn:    gcimporter.Import,
-	packages: make(map[string]*types.Package),
+func getImporter() types.ImporterFrom {
+	return importer{
+		impFn:    gcimporter.Import,
+		packages: make(map[string]*types.Package),
+	}
 }
 
 // importer implements go/types.Importer.

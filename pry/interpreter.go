@@ -36,13 +36,10 @@ type Scope struct {
 	Vals   map[string]interface{}
 	Parent *Scope
 	Files  map[string]*ast.File
-	config struct {
-		sync.Mutex
-		*types.Config
-	}
-	path string
-	line int
-	fset *token.FileSet
+	config *types.Config
+	path   string
+	line   int
+	fset   *token.FileSet
 
 	isSelect   bool
 	typeAssert reflect.Type
@@ -912,9 +909,9 @@ func (scope *Scope) ConfigureTypes(path string, line int) error {
 	scope.path = path
 	scope.line = line
 	scope.fset = token.NewFileSet() // positions are relative to fset
-	scope.config.Config = &types.Config{
+	scope.config = &types.Config{
 		FakeImportC: true,
-		Importer:    gcImporter,
+		Importer:    getImporter(),
 	}
 
 	// Parse the file containing this very example
@@ -1010,9 +1007,6 @@ func (scope *Scope) Render(x ast.Node) string {
 
 // TypeCheck does type checking and returns the info object
 func (scope *Scope) TypeCheck() (*types.Info, []error) {
-	scope.config.Lock()
-	defer scope.config.Unlock()
-
 	var errs []error
 	scope.config.Error = func(err error) {
 		if !strings.HasSuffix(err.Error(), "not used") {
