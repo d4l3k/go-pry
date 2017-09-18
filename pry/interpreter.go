@@ -486,9 +486,17 @@ func (scope *Scope) Interpret(expr ast.Node) (interface{}, error) {
 		} else {
 			for i, r := range rhs {
 				variable := lhs[i]
-				_, exists := scope.Get(variable)
+				current, exists := scope.Get(variable)
 				if !exists && !define {
 					return nil, fmt.Errorf("variable %#v is not defined", variable)
+				}
+				isModAssign := e.Tok != token.ASSIGN && e.Tok != token.DEFINE
+				if isModAssign {
+					var err error
+					r, err = ComputeBinaryOp(current, r, DeAssign(e.Tok))
+					if err != nil {
+						return nil, err
+					}
 				}
 				scope.Set(variable, r)
 			}

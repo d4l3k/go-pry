@@ -14,6 +14,36 @@ var ErrChanRecvFailed = errors.New("receive failed: channel closed")
 // select statement.
 var ErrChanRecvInSelect = errors.New("receive failed: in select")
 
+// DeAssign takes a *_ASSIGN token and returns the corresponding * token.
+func DeAssign(tok token.Token) token.Token {
+	switch tok {
+	case token.ADD_ASSIGN:
+		return token.ADD
+	case token.SUB_ASSIGN:
+		return token.SUB
+	case token.MUL_ASSIGN:
+		return token.MUL
+	case token.QUO_ASSIGN:
+		return token.QUO
+	case token.REM_ASSIGN:
+		return token.REM
+	case token.AND_ASSIGN:
+		return token.AND
+	case token.OR_ASSIGN:
+		return token.OR
+	case token.XOR_ASSIGN:
+		return token.XOR
+	case token.SHL_ASSIGN:
+		return token.SHL
+	case token.SHR_ASSIGN:
+		return token.SHR
+	case token.AND_NOT_ASSIGN:
+		return token.AND_NOT
+	}
+
+	return tok
+}
+
 // ComputeBinaryOp executes the corresponding binary operation (+, -, etc) on two interfaces.
 func ComputeBinaryOp(xI, yI interface{}, op token.Token) (interface{}, error) {
 	typeX := reflect.TypeOf(xI)
