@@ -1104,6 +1104,47 @@ func TestDefer(t *testing.T) {
 	}
 }
 
+func TestStringAppend(t *testing.T) {
+	t.Parallel()
+
+	scope := NewScope()
+
+	out, err := scope.InterpretString(`
+	a := "foo"
+	a += "bar"
+	a
+	`)
+	if err != nil {
+		t.Error(err)
+	}
+	expected := "foobar"
+	if !reflect.DeepEqual(expected, out) {
+		t.Errorf("Expected %#v got %#v.", expected, out)
+	}
+}
+
+func TestIntMod(t *testing.T) {
+	t.Parallel()
+
+	scope := NewScope()
+
+	out, err := scope.InterpretString(`
+	a := 10
+	a += 6
+	a -= 1
+	a /= 3
+	a *= 4
+	a
+	`)
+	if err != nil {
+		t.Error(err)
+	}
+	expected := 20
+	if !reflect.DeepEqual(expected, out) {
+		t.Errorf("Expected %#v got %#v.", expected, out)
+	}
+}
+
 // TODO Packages
 
 // TODO References
