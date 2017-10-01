@@ -241,7 +241,7 @@ func main() {
 	testsRequired := cmdArgs[0] == "test"
 	for _, dir := range goDirs {
 		filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
-			if !testsRequired && strings.HasSuffix(path, "_test.go") || !strings.HasSuffix(path, ".go") {
+			if !testsRequired && strings.HasSuffix(path, "_test.go") || !strings.HasSuffix(path, ".go") || strings.Contains(path, "vendor/") {
 				return nil
 			}
 			for _, file := range processedFiles {
