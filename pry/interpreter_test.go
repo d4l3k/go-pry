@@ -170,6 +170,24 @@ func TestMapLiteral(t *testing.T) {
 	}
 }
 
+func TestMapSet(t *testing.T) {
+	t.Parallel()
+
+	scope := NewScope()
+	out, err := scope.InterpretString(`
+		a := map[string]int{}
+		a["blah"] = 1
+		a["blah"]
+	`)
+	if err != nil {
+		t.Errorf("%+v", err)
+	}
+	expected := 1
+	if !reflect.DeepEqual(expected, out) {
+		t.Errorf("Expected %#v got %#v.", expected, out)
+	}
+}
+
 func TestMapLiteralInterface(t *testing.T) {
 	t.Parallel()
 

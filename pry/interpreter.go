@@ -558,19 +558,31 @@ func (scope *Scope) Interpret(expr ast.Node) (interface{}, error) {
 				if err != nil {
 					return nil, err
 				}
-				indexInt, ok := index.(int)
-				if !ok {
-					return nil, errors.Errorf("expected index to be int, got %#v", err)
-				}
 				x, exists := scope.GetPointer(ident.Name)
 				if !exists {
 					return nil, errors.Errorf("variable %#v is not defined", ident.Name)
 				}
-				elem := reflect.ValueOf(x).Elem().Index(indexInt)
-				if !elem.CanSet() {
-					return nil, errors.Errorf("can't set index on %#v", elem)
+				elem := reflect.ValueOf(x).Elem()
+
+				switch elem.Kind() {
+				case reflect.Slice, reflect.Array:
+					indexInt, ok := index.(int)
+					if !ok {
+						return nil, errors.Errorf("expected index to be int, got %#v", index)
+					}
+					elem = elem.Index(indexInt)
+					if !elem.CanSet() {
+						return nil, errors.Errorf("can't set index on %#v", x)
+					}
+					elem.Set(reflect.ValueOf(r))
+
+				case reflect.Map:
+					elem.SetMapIndex(reflect.ValueOf(index), reflect.ValueOf(r))
+
+				default:
+					return nil, errors.Errorf("unknown type of X %#v", lhsExpr)
 				}
-				elem.Set(reflect.ValueOf(r))
+
 				return nil, nil
 
 			default:
