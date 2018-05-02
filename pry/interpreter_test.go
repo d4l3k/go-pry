@@ -70,6 +70,7 @@ func TestCharLiteral(t *testing.T) {
 		t.Errorf("Expected 'a' got %#v.", out)
 	}
 }
+
 func TestArrayLiteral(t *testing.T) {
 	t.Parallel()
 
@@ -83,6 +84,75 @@ func TestArrayLiteral(t *testing.T) {
 		t.Errorf("Expected %#v got %#v.", expected, out)
 	}
 }
+
+func TestFixedArrayLiteral(t *testing.T) {
+	t.Parallel()
+
+	scope := NewScope()
+	out, err := scope.InterpretString(`[4]int{1,2,3,4}`)
+	if err != nil {
+		t.Error(err)
+	}
+	expected := [4]int{1, 2, 3, 4}
+	if !reflect.DeepEqual(expected, out) {
+		t.Errorf("Expected %#v got %#v.", expected, out)
+	}
+}
+
+func TestFixedArray(t *testing.T) {
+	t.Parallel()
+
+	scope := NewScope()
+	out, err := scope.InterpretString(`
+		var a [3]int
+		a[2]
+	`)
+	if err != nil {
+		t.Error(err)
+	}
+	expected := 0
+	if !reflect.DeepEqual(expected, out) {
+		t.Errorf("Expected %#v got %#v.", expected, out)
+	}
+}
+
+func TestFixedArraySet(t *testing.T) {
+	t.Parallel()
+
+	scope := NewScope()
+	out, err := scope.InterpretString(`
+		var a [3]int
+		b := &a
+		a[2] = 1
+		b[2]
+	`)
+	if err != nil {
+		t.Errorf("%+v", err)
+	}
+	expected := 1
+	if !reflect.DeepEqual(expected, out) {
+		t.Errorf("Expected %#v got %#v.", expected, out)
+	}
+}
+
+func TestArraySet(t *testing.T) {
+	t.Parallel()
+
+	scope := NewScope()
+	out, err := scope.InterpretString(`
+		a := []int{1,2,3,4}
+		a[2] = 1
+		a[2]
+	`)
+	if err != nil {
+		t.Errorf("%+v", err)
+	}
+	expected := 1
+	if !reflect.DeepEqual(expected, out) {
+		t.Errorf("Expected %#v got %#v.", expected, out)
+	}
+}
+
 func TestMapLiteral(t *testing.T) {
 	t.Parallel()
 
@@ -95,6 +165,24 @@ func TestMapLiteral(t *testing.T) {
 		"duck":   5,
 		"banana": -123,
 	}
+	if !reflect.DeepEqual(expected, out) {
+		t.Errorf("Expected %#v got %#v.", expected, out)
+	}
+}
+
+func TestMapSet(t *testing.T) {
+	t.Parallel()
+
+	scope := NewScope()
+	out, err := scope.InterpretString(`
+		a := map[string]int{}
+		a["blah"] = 1
+		a["blah"]
+	`)
+	if err != nil {
+		t.Errorf("%+v", err)
+	}
+	expected := 1
 	if !reflect.DeepEqual(expected, out) {
 		t.Errorf("Expected %#v got %#v.", expected, out)
 	}
