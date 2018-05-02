@@ -70,6 +70,7 @@ func TestCharLiteral(t *testing.T) {
 		t.Errorf("Expected 'a' got %#v.", out)
 	}
 }
+
 func TestArrayLiteral(t *testing.T) {
 	t.Parallel()
 
@@ -83,6 +84,42 @@ func TestArrayLiteral(t *testing.T) {
 		t.Errorf("Expected %#v got %#v.", expected, out)
 	}
 }
+
+func TestFixedArray(t *testing.T) {
+	t.Parallel()
+
+	scope := NewScope()
+	out, err := scope.InterpretString(`
+		var a [3]int
+		a[2]
+	`)
+	if err != nil {
+		t.Error(err)
+	}
+	expected := 0
+	if !reflect.DeepEqual(expected, out) {
+		t.Errorf("Expected %#v got %#v.", expected, out)
+	}
+}
+
+func TestFixedArraySet(t *testing.T) {
+	t.Parallel()
+
+	scope := NewScope()
+	out, err := scope.InterpretString(`
+		var a [3]int
+		a[2] = 1
+		a[2]
+	`)
+	if err != nil {
+		t.Error(err)
+	}
+	expected := 1
+	if !reflect.DeepEqual(expected, out) {
+		t.Errorf("Expected %#v got %#v.", expected, out)
+	}
+}
+
 func TestMapLiteral(t *testing.T) {
 	t.Parallel()
 

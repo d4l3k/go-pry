@@ -331,8 +331,15 @@ func (scope *Scope) Interpret(expr ast.Node) (interface{}, error) {
 		if err != nil {
 			return nil, err
 		}
-		arrType := reflect.SliceOf(typ.(reflect.Type))
-		return arrType, nil
+		if e.Len == nil {
+			return reflect.SliceOf(typ.(reflect.Type)), nil
+		}
+
+		len, err := scope.Interpret(e.Len)
+		if err != nil {
+			return nil, err
+		}
+		return reflect.ArrayOf(len.(int), typ.(reflect.Type)), nil
 
 	case *ast.MapType:
 		keyType, err := scope.Interpret(e.Key)
@@ -452,12 +459,15 @@ func (scope *Scope) Interpret(expr ast.Node) (interface{}, error) {
 		define := e.Tok == token.DEFINE
 		lhs := make([]string, len(e.Lhs))
 		for i, id := range e.Lhs {
-			lhsIdent, isIdent := id.(*ast.Ident)
-			if !isIdent {
-				return nil, fmt.Errorf("%#v assignment is not ident", id)
+			switch lhsExpr := id.(type) {
+			case *ast.Ident:
+				lhs[i] = lhsExpr.Name
+
+			default:
+				return nil, errors.Errorf("unknown assignment expr %#v", id)
 			}
-			lhs[i] = lhsIdent.Name
 		}
+
 		rhs := make([]interface{}, len(e.Rhs))
 		for i, expr := range e.Rhs {
 			val, err := scope.Interpret(expr)
@@ -466,9 +476,11 @@ func (scope *Scope) Interpret(expr ast.Node) (interface{}, error) {
 			}
 			rhs[i] = val
 		}
+
 		if len(rhs) != 1 && len(rhs) != len(lhs) {
 			return nil, fmt.Errorf("assignment count mismatch: %d = %d", len(lhs), len(rhs))
 		}
+
 		if len(rhs) == 1 && len(lhs) > 1 && reflect.TypeOf(rhs[0]).Kind() == reflect.Slice {
 			rhsV := reflect.ValueOf(rhs[0])
 			rhsLen := rhsV.Len()
