@@ -625,6 +625,11 @@ func ComputeBinaryOp(xI, yI interface{}, op token.Token) (interface{}, error) {
 
 // ComputeUnaryOp computes the corresponding unary (+x, -x) operation on an interface.
 func (scope *Scope) ComputeUnaryOp(xI interface{}, op token.Token) (interface{}, error) {
+	switch op {
+	case token.MUL:
+		return reflect.ValueOf(xI).Elem().Interface(), nil
+	}
+
 	switch xI.(type) {
 	case bool:
 		x := xI.(bool)

@@ -108,11 +108,12 @@ func TestFixedArraySet(t *testing.T) {
 	scope := NewScope()
 	out, err := scope.InterpretString(`
 		var a [3]int
+		b := &a
 		a[2] = 1
-		a[2]
+		b[2]
 	`)
 	if err != nil {
-		t.Error(err)
+		t.Errorf("%+v", err)
 	}
 	expected := 1
 	if !reflect.DeepEqual(expected, out) {
