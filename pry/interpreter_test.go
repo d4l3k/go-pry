@@ -85,6 +85,20 @@ func TestArrayLiteral(t *testing.T) {
 	}
 }
 
+func TestFixedArrayLiteral(t *testing.T) {
+	t.Parallel()
+
+	scope := NewScope()
+	out, err := scope.InterpretString(`[4]int{1,2,3,4}`)
+	if err != nil {
+		t.Error(err)
+	}
+	expected := [4]int{1, 2, 3, 4}
+	if !reflect.DeepEqual(expected, out) {
+		t.Errorf("Expected %#v got %#v.", expected, out)
+	}
+}
+
 func TestFixedArray(t *testing.T) {
 	t.Parallel()
 
@@ -111,6 +125,24 @@ func TestFixedArraySet(t *testing.T) {
 		b := &a
 		a[2] = 1
 		b[2]
+	`)
+	if err != nil {
+		t.Errorf("%+v", err)
+	}
+	expected := 1
+	if !reflect.DeepEqual(expected, out) {
+		t.Errorf("Expected %#v got %#v.", expected, out)
+	}
+}
+
+func TestArraySet(t *testing.T) {
+	t.Parallel()
+
+	scope := NewScope()
+	out, err := scope.InterpretString(`
+		a := []int{1,2,3,4}
+		a[2] = 1
+		a[2]
 	`)
 	if err != nil {
 		t.Errorf("%+v", err)

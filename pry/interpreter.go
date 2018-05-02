@@ -293,7 +293,16 @@ func (scope *Scope) Interpret(expr ast.Node) (interface{}, error) {
 		switch t := e.Type.(type) {
 		case *ast.ArrayType:
 			l := len(e.Elts)
-			slice := reflect.MakeSlice(typ.(reflect.Type), l, l)
+			aType := typ.(reflect.Type)
+			var slice reflect.Value
+			switch aType.Kind() {
+			case reflect.Slice:
+				slice = reflect.MakeSlice(aType, l, l)
+			case reflect.Array:
+				slice = reflect.New(aType).Elem()
+			default:
+				return nil, errors.Errorf("unknown array type %#v", typ)
+			}
 			for i, elem := range e.Elts {
 				elemValue, err := scope.Interpret(elem)
 				if err != nil {
