@@ -1,10 +1,11 @@
 package pry
 
 import (
-	"errors"
 	"fmt"
 	"go/token"
 	"reflect"
+
+	"github.com/pkg/errors"
 )
 
 // ErrChanRecvFailed occurs when a channel is closed.
@@ -13,6 +14,8 @@ var ErrChanRecvFailed = errors.New("receive failed: channel closed")
 // ErrChanRecvInSelect is an internal error that is used to indicate it's in a
 // select statement.
 var ErrChanRecvInSelect = errors.New("receive failed: in select")
+
+var ErrDivisionByZero = errors.New("division by zero")
 
 // DeAssign takes a *_ASSIGN token and returns the corresponding * token.
 func DeAssign(tok token.Token) token.Token {
@@ -68,8 +71,16 @@ func ComputeBinaryOp(xI, yI interface{}, op token.Token) (interface{}, error) {
 			case token.MUL:
 				return x * y, nil
 			case token.QUO:
+				if y == 0 {
+					return nil, ErrDivisionByZero
+				}
+
 				return x / y, nil
 			case token.REM:
+				if y == 0 {
+					return nil, ErrDivisionByZero
+				}
+
 				return x % y, nil
 			case token.AND:
 				return x & y, nil
@@ -99,8 +110,16 @@ func ComputeBinaryOp(xI, yI interface{}, op token.Token) (interface{}, error) {
 			case token.MUL:
 				return x * y, nil
 			case token.QUO:
+				if y == 0 {
+					return nil, ErrDivisionByZero
+				}
+
 				return x / y, nil
 			case token.REM:
+				if y == 0 {
+					return nil, ErrDivisionByZero
+				}
+
 				return x % y, nil
 			case token.AND:
 				return x & y, nil
@@ -130,8 +149,16 @@ func ComputeBinaryOp(xI, yI interface{}, op token.Token) (interface{}, error) {
 			case token.MUL:
 				return x * y, nil
 			case token.QUO:
+				if y == 0 {
+					return nil, ErrDivisionByZero
+				}
+
 				return x / y, nil
 			case token.REM:
+				if y == 0 {
+					return nil, ErrDivisionByZero
+				}
+
 				return x % y, nil
 			case token.AND:
 				return x & y, nil
@@ -161,8 +188,16 @@ func ComputeBinaryOp(xI, yI interface{}, op token.Token) (interface{}, error) {
 			case token.MUL:
 				return x * y, nil
 			case token.QUO:
+				if y == 0 {
+					return nil, ErrDivisionByZero
+				}
+
 				return x / y, nil
 			case token.REM:
+				if y == 0 {
+					return nil, ErrDivisionByZero
+				}
+
 				return x % y, nil
 			case token.AND:
 				return x & y, nil
@@ -192,8 +227,16 @@ func ComputeBinaryOp(xI, yI interface{}, op token.Token) (interface{}, error) {
 			case token.MUL:
 				return x * y, nil
 			case token.QUO:
+				if y == 0 {
+					return nil, ErrDivisionByZero
+				}
+
 				return x / y, nil
 			case token.REM:
+				if y == 0 {
+					return nil, ErrDivisionByZero
+				}
+
 				return x % y, nil
 			case token.AND:
 				return x & y, nil
@@ -223,8 +266,16 @@ func ComputeBinaryOp(xI, yI interface{}, op token.Token) (interface{}, error) {
 			case token.MUL:
 				return x * y, nil
 			case token.QUO:
+				if y == 0 {
+					return nil, ErrDivisionByZero
+				}
+
 				return x / y, nil
 			case token.REM:
+				if y == 0 {
+					return nil, ErrDivisionByZero
+				}
+
 				return x % y, nil
 			case token.AND:
 				return x & y, nil
@@ -254,8 +305,16 @@ func ComputeBinaryOp(xI, yI interface{}, op token.Token) (interface{}, error) {
 			case token.MUL:
 				return x * y, nil
 			case token.QUO:
+				if y == 0 {
+					return nil, ErrDivisionByZero
+				}
+
 				return x / y, nil
 			case token.REM:
+				if y == 0 {
+					return nil, ErrDivisionByZero
+				}
+
 				return x % y, nil
 			case token.AND:
 				return x & y, nil
@@ -285,8 +344,16 @@ func ComputeBinaryOp(xI, yI interface{}, op token.Token) (interface{}, error) {
 			case token.MUL:
 				return x * y, nil
 			case token.QUO:
+				if y == 0 {
+					return nil, ErrDivisionByZero
+				}
+
 				return x / y, nil
 			case token.REM:
+				if y == 0 {
+					return nil, ErrDivisionByZero
+				}
+
 				return x % y, nil
 			case token.AND:
 				return x & y, nil
@@ -316,8 +383,16 @@ func ComputeBinaryOp(xI, yI interface{}, op token.Token) (interface{}, error) {
 			case token.MUL:
 				return x * y, nil
 			case token.QUO:
+				if y == 0 {
+					return nil, ErrDivisionByZero
+				}
+
 				return x / y, nil
 			case token.REM:
+				if y == 0 {
+					return nil, ErrDivisionByZero
+				}
+
 				return x % y, nil
 			case token.AND:
 				return x & y, nil
@@ -347,8 +422,16 @@ func ComputeBinaryOp(xI, yI interface{}, op token.Token) (interface{}, error) {
 			case token.MUL:
 				return x * y, nil
 			case token.QUO:
+				if y == 0 {
+					return nil, ErrDivisionByZero
+				}
+
 				return x / y, nil
 			case token.REM:
+				if y == 0 {
+					return nil, ErrDivisionByZero
+				}
+
 				return x % y, nil
 			case token.AND:
 				return x & y, nil
@@ -378,8 +461,16 @@ func ComputeBinaryOp(xI, yI interface{}, op token.Token) (interface{}, error) {
 			case token.MUL:
 				return x * y, nil
 			case token.QUO:
+				if y == 0 {
+					return nil, ErrDivisionByZero
+				}
+
 				return x / y, nil
 			case token.REM:
+				if y == 0 {
+					return nil, ErrDivisionByZero
+				}
+
 				return x % y, nil
 			case token.AND:
 				return x & y, nil
@@ -409,6 +500,10 @@ func ComputeBinaryOp(xI, yI interface{}, op token.Token) (interface{}, error) {
 			case token.MUL:
 				return x * y, nil
 			case token.QUO:
+				if y == 0 {
+					return nil, ErrDivisionByZero
+				}
+
 				return x / y, nil
 			}
 		case complex128:
@@ -422,6 +517,10 @@ func ComputeBinaryOp(xI, yI interface{}, op token.Token) (interface{}, error) {
 			case token.MUL:
 				return x * y, nil
 			case token.QUO:
+				if y == 0 {
+					return nil, ErrDivisionByZero
+				}
+
 				return x / y, nil
 			}
 		case float32:
@@ -435,6 +534,10 @@ func ComputeBinaryOp(xI, yI interface{}, op token.Token) (interface{}, error) {
 			case token.MUL:
 				return x * y, nil
 			case token.QUO:
+				if y == 0 {
+					return nil, ErrDivisionByZero
+				}
+
 				return x / y, nil
 			case token.LSS:
 				return x < y, nil
@@ -456,6 +559,10 @@ func ComputeBinaryOp(xI, yI interface{}, op token.Token) (interface{}, error) {
 			case token.MUL:
 				return x * y, nil
 			case token.QUO:
+				if y == 0 {
+					return nil, ErrDivisionByZero
+				}
+
 				return x / y, nil
 			case token.LSS:
 				return x < y, nil
@@ -625,6 +732,10 @@ func ComputeBinaryOp(xI, yI interface{}, op token.Token) (interface{}, error) {
 
 // ComputeUnaryOp computes the corresponding unary (+x, -x) operation on an interface.
 func (scope *Scope) ComputeUnaryOp(xI interface{}, op token.Token) (interface{}, error) {
+	if xI == nil {
+		return nil, errors.Errorf("can't run unary ops on nil value")
+	}
+
 	switch op {
 	case token.MUL:
 		return reflect.ValueOf(xI).Elem().Interface(), nil
