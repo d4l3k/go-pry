@@ -493,7 +493,7 @@ func (scope *Scope) Interpret(expr ast.Node) (interface{}, error) {
 		if !isLowInt || !isHighInt {
 			return nil, fmt.Errorf("slice: indexes have to be an ints not %T and %T", low, high)
 		}
-		if lowVal < 0 || highVal >= xVal.Len() {
+		if lowVal < 0 || highVal >= xVal.Len() || highVal < lowVal {
 			return nil, errors.New("slice: index out of bounds")
 		}
 		return xVal.Slice(lowVal, highVal).Interface(), nil
@@ -996,7 +996,11 @@ func (scope *Scope) ExecuteFunc(funExpr ast.Expr, args []interface{}) (interface
 
 	switch funV := fun.(type) {
 	case reflect.Type:
+		if len(args) != 1 {
+			return nil, errors.Errorf("expected args len = 1; args %#v", args)
+		}
 		return reflect.ValueOf(args[0]).Convert(funV).Interface(), nil
+
 	case *Func:
 		// TODO enforce func return values
 		currentScope := scope.NewChild()
@@ -1030,6 +1034,10 @@ func (scope *Scope) ExecuteFunc(funExpr ast.Expr, args []interface{}) (interface
 	var valueArgs []reflect.Value
 	for _, v := range args {
 		valueArgs = append(valueArgs, reflect.ValueOf(v))
+	}
+	funType := funVal.Type()
+	if funType.NumIn() != len(valueArgs) && !funType.IsVariadic() {
+		return nil, errors.Errorf("number of arguments doesn't match function; expected %d; got %+v", funVal.Type().NumIn(), args)
 	}
 	values := ValuesToInterfaces(funVal.Call(valueArgs))
 	if len(values) == 0 {
