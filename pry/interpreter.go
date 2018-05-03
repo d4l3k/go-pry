@@ -279,9 +279,16 @@ func (scope *Scope) Interpret(expr ast.Node) (interface{}, error) {
 		switch e.Kind {
 		case token.INT:
 			n, err := strconv.ParseInt(e.Value, 0, 64)
-			return int(n), err
+			if err != nil {
+				return nil, err
+			}
+			return int(n), nil
 		case token.FLOAT, token.IMAG:
-			return strconv.ParseFloat(e.Value, 64)
+			v, err := strconv.ParseFloat(e.Value, 64)
+			if err != nil {
+				return nil, err
+			}
+			return v, nil
 		case token.CHAR:
 			return (rune)(e.Value[1]), nil
 		case token.STRING:
