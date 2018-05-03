@@ -6,6 +6,19 @@ import (
 	"testing"
 )
 
+func TestEmptyString(t *testing.T) {
+	t.Parallel()
+
+	scope := NewScope()
+	out, err := scope.InterpretString("")
+	if err != nil {
+		t.Error(err)
+	}
+	if out != nil {
+		t.Error("expected nil")
+	}
+}
+
 // Literals
 func TestStringLiteral(t *testing.T) {
 	t.Parallel()

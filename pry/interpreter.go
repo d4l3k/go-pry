@@ -168,9 +168,11 @@ func (scope *Scope) ParseString(exprStr string) (ast.Node, int, error) {
 		return expr.(ast.Node), shifted, nil
 	} else if err != nil {
 		return expr, shifted, err
-	} else {
-		return expr.(*ast.CallExpr).Fun.(*ast.FuncLit).Body, shifted, nil
 	}
+	if expr == nil {
+		return nil, 0, errors.Errorf("expression is empty")
+	}
+	return expr.(*ast.CallExpr).Fun.(*ast.FuncLit).Body, shifted, nil
 }
 
 // InterpretString interprets a string of go code and returns the result.
