@@ -172,7 +172,11 @@ func (scope *Scope) ParseString(exprStr string) (ast.Node, int, error) {
 	if expr == nil {
 		return nil, 0, errors.Errorf("expression is empty")
 	}
-	return expr.(*ast.CallExpr).Fun.(*ast.FuncLit).Body, shifted, nil
+	callExpr, ok := expr.(*ast.CallExpr)
+	if !ok {
+		return nil, 0, errors.Errorf("expected CallExpr; got %#v", callExpr)
+	}
+	return callExpr.Fun.(*ast.FuncLit).Body, shifted, nil
 }
 
 // InterpretString interprets a string of go code and returns the result.
@@ -743,7 +747,11 @@ func (scope *Scope) Interpret(expr ast.Node) (interface{}, error) {
 		if err != nil {
 			return nil, err
 		}
-		succeeded := reflect.ValueOf(channel).TrySend(reflect.ValueOf(val))
+		chanV := reflect.ValueOf(channel)
+		if chanV.Kind() != reflect.Chan {
+			return nil, errors.Errorf("expected chan; got %#v", channel)
+		}
+		succeeded := chanV.TrySend(reflect.ValueOf(val))
 		if !succeeded {
 			return nil, ErrChanSendFailed
 		}
@@ -989,6 +997,10 @@ func (scope *Scope) ExecuteFunc(funExpr ast.Expr, args []interface{}) (interface
 	}
 
 	funVal := reflect.ValueOf(fun)
+
+	if funVal.Kind() != reflect.Func {
+		return nil, errors.Errorf("expected func; got %#v", fun)
+	}
 
 	var valueArgs []reflect.Value
 	for _, v := range args {
