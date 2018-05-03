@@ -165,7 +165,11 @@ func (scope *Scope) ParseString(exprStr string) (ast.Node, int, error) {
 		if err != nil {
 			return expr, shifted, err
 		}
-		return expr.(ast.Node), shifted, nil
+		node, ok := expr.(ast.Node)
+		if !ok {
+			return nil, 0, errors.Errorf("expected ast.Node; got %#v", expr)
+		}
+		return node, shifted, nil
 	} else if err != nil {
 		return expr, shifted, err
 	}
@@ -386,15 +390,23 @@ func (scope *Scope) Interpret(expr ast.Node) (interface{}, error) {
 		if err != nil {
 			return nil, err
 		}
+		rType, ok := typ.(reflect.Type)
+		if !ok {
+			return nil, errors.Errorf("invalid type %#v", typ)
+		}
 		if e.Len == nil {
-			return reflect.SliceOf(typ.(reflect.Type)), nil
+			return reflect.SliceOf(rType), nil
 		}
 
 		len, err := scope.Interpret(e.Len)
 		if err != nil {
 			return nil, err
 		}
-		return reflect.ArrayOf(len.(int), typ.(reflect.Type)), nil
+		lenI, ok := len.(int)
+		if !ok {
+			return nil, errors.Errorf("expected int; got %#v", len)
+		}
+		return reflect.ArrayOf(lenI, rType), nil
 
 	case *ast.MapType:
 		keyType, err := scope.Interpret(e.Key)
@@ -432,24 +444,30 @@ func (scope *Scope) Interpret(expr ast.Node) (interface{}, error) {
 		for xVal.Type().Kind() == reflect.Ptr {
 			xVal = xVal.Elem()
 		}
-		if xVal.Type().Kind() == reflect.Map {
+		switch xVal.Type().Kind() {
+		case reflect.Map:
 			val := xVal.MapIndex(reflect.ValueOf(i))
 			if !val.IsValid() {
 				// If not valid key, return the "zero" type. Eg for int 0, string ""
 				return reflect.Zero(xVal.Type().Elem()).Interface(), nil
 			}
 			return val.Interface(), nil
+
+		case reflect.Slice, reflect.Array:
+			iVal, isInt := i.(int)
+			if !isInt {
+				return nil, fmt.Errorf("index has to be an int not %T", i)
+			}
+			if iVal >= xVal.Len() || iVal < 0 {
+				return nil, errors.New("slice index out of range")
+			}
+
+			return xVal.Index(iVal).Interface(), nil
+
+		default:
+			return nil, errors.Errorf("invalid X for IndexExpr: %#v", X)
 		}
 
-		iVal, isInt := i.(int)
-		if !isInt {
-			return nil, fmt.Errorf("index has to be an int not %T", i)
-		}
-		if iVal >= xVal.Len() || iVal < 0 {
-			return nil, errors.New("slice index out of range")
-		}
-
-		return xVal.Index(iVal).Interface(), nil
 	case *ast.SliceExpr:
 		low, err := scope.Interpret(e.Low)
 		if err != nil {
