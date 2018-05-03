@@ -490,6 +490,10 @@ func (scope *Scope) Interpret(expr ast.Node) (interface{}, error) {
 		if low == nil {
 			low = 0
 		}
+		kind := xVal.Kind()
+		if kind != reflect.Array && kind != reflect.Slice {
+			return nil, errors.Errorf("invalid X for SliceExpr: %#v", X)
+		}
 		if high == nil {
 			high = xVal.Len()
 		}
@@ -605,6 +609,9 @@ func (scope *Scope) Interpret(expr ast.Node) (interface{}, error) {
 					indexInt, ok := index.(int)
 					if !ok {
 						return nil, errors.Errorf("expected index to be int, got %#v", index)
+					}
+					if indexInt >= elem.Len() {
+						return nil, errors.Errorf("index out of range")
 					}
 					elem = elem.Index(indexInt)
 					if !elem.CanSet() {
