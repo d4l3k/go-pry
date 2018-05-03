@@ -165,12 +165,22 @@ func (scope *Scope) ParseString(exprStr string) (ast.Node, int, error) {
 		if err != nil {
 			return expr, shifted, err
 		}
-		return expr.(ast.Node), shifted, nil
+		node, ok := expr.(ast.Node)
+		if !ok {
+			return nil, 0, errors.Errorf("expected ast.Node; got %#v", expr)
+		}
+		return node, shifted, nil
 	} else if err != nil {
 		return expr, shifted, err
-	} else {
-		return expr.(*ast.CallExpr).Fun.(*ast.FuncLit).Body, shifted, nil
 	}
+	if expr == nil {
+		return nil, 0, errors.Errorf("expression is empty")
+	}
+	callExpr, ok := expr.(*ast.CallExpr)
+	if !ok {
+		return nil, 0, errors.Errorf("expected CallExpr; got %#v", callExpr)
+	}
+	return callExpr.Fun.(*ast.FuncLit).Body, shifted, nil
 }
 
 // InterpretString interprets a string of go code and returns the result.
@@ -273,9 +283,16 @@ func (scope *Scope) Interpret(expr ast.Node) (interface{}, error) {
 		switch e.Kind {
 		case token.INT:
 			n, err := strconv.ParseInt(e.Value, 0, 64)
-			return int(n), err
+			if err != nil {
+				return nil, err
+			}
+			return int(n), nil
 		case token.FLOAT, token.IMAG:
-			return strconv.ParseFloat(e.Value, 64)
+			v, err := strconv.ParseFloat(e.Value, 64)
+			if err != nil {
+				return nil, err
+			}
+			return v, nil
 		case token.CHAR:
 			return (rune)(e.Value[1]), nil
 		case token.STRING:
@@ -303,6 +320,11 @@ func (scope *Scope) Interpret(expr ast.Node) (interface{}, error) {
 			default:
 				return nil, errors.Errorf("unknown array type %#v", typ)
 			}
+
+			if len(e.Elts) > slice.Len() {
+				return nil, errors.Errorf("array index %d out of bounds [0:%d]", slice.Len(), slice.Len())
+			}
+
 			for i, elem := range e.Elts {
 				elemValue, err := scope.Interpret(elem)
 				if err != nil {
@@ -373,15 +395,26 @@ func (scope *Scope) Interpret(expr ast.Node) (interface{}, error) {
 		if err != nil {
 			return nil, err
 		}
+		rType, ok := typ.(reflect.Type)
+		if !ok {
+			return nil, errors.Errorf("invalid type %#v", typ)
+		}
 		if e.Len == nil {
-			return reflect.SliceOf(typ.(reflect.Type)), nil
+			return reflect.SliceOf(rType), nil
 		}
 
 		len, err := scope.Interpret(e.Len)
 		if err != nil {
 			return nil, err
 		}
-		return reflect.ArrayOf(len.(int), typ.(reflect.Type)), nil
+		lenI, ok := len.(int)
+		if !ok {
+			return nil, errors.Errorf("expected int; got %#v", len)
+		}
+		if lenI < 0 {
+			return nil, errors.Errorf("negative array size")
+		}
+		return reflect.ArrayOf(lenI, rType), nil
 
 	case *ast.MapType:
 		keyType, err := scope.Interpret(e.Key)
@@ -419,24 +452,30 @@ func (scope *Scope) Interpret(expr ast.Node) (interface{}, error) {
 		for xVal.Type().Kind() == reflect.Ptr {
 			xVal = xVal.Elem()
 		}
-		if xVal.Type().Kind() == reflect.Map {
+		switch xVal.Type().Kind() {
+		case reflect.Map:
 			val := xVal.MapIndex(reflect.ValueOf(i))
 			if !val.IsValid() {
 				// If not valid key, return the "zero" type. Eg for int 0, string ""
 				return reflect.Zero(xVal.Type().Elem()).Interface(), nil
 			}
 			return val.Interface(), nil
+
+		case reflect.Slice, reflect.Array:
+			iVal, isInt := i.(int)
+			if !isInt {
+				return nil, fmt.Errorf("index has to be an int not %T", i)
+			}
+			if iVal >= xVal.Len() || iVal < 0 {
+				return nil, errors.New("slice index out of range")
+			}
+
+			return xVal.Index(iVal).Interface(), nil
+
+		default:
+			return nil, errors.Errorf("invalid X for IndexExpr: %#v", X)
 		}
 
-		iVal, isInt := i.(int)
-		if !isInt {
-			return nil, fmt.Errorf("index has to be an int not %T", i)
-		}
-		if iVal >= xVal.Len() || iVal < 0 {
-			return nil, errors.New("slice index out of range")
-		}
-
-		return xVal.Index(iVal).Interface(), nil
 	case *ast.SliceExpr:
 		low, err := scope.Interpret(e.Low)
 		if err != nil {
@@ -454,6 +493,10 @@ func (scope *Scope) Interpret(expr ast.Node) (interface{}, error) {
 		if low == nil {
 			low = 0
 		}
+		kind := xVal.Kind()
+		if kind != reflect.Array && kind != reflect.Slice {
+			return nil, errors.Errorf("invalid X for SliceExpr: %#v", X)
+		}
 		if high == nil {
 			high = xVal.Len()
 		}
@@ -462,7 +505,7 @@ func (scope *Scope) Interpret(expr ast.Node) (interface{}, error) {
 		if !isLowInt || !isHighInt {
 			return nil, fmt.Errorf("slice: indexes have to be an ints not %T and %T", low, high)
 		}
-		if lowVal < 0 || highVal >= xVal.Len() {
+		if lowVal < 0 || highVal >= xVal.Len() || highVal < lowVal {
 			return nil, errors.New("slice: index out of bounds")
 		}
 		return xVal.Slice(lowVal, highVal).Interface(), nil
@@ -569,6 +612,9 @@ func (scope *Scope) Interpret(expr ast.Node) (interface{}, error) {
 					indexInt, ok := index.(int)
 					if !ok {
 						return nil, errors.Errorf("expected index to be int, got %#v", index)
+					}
+					if indexInt >= elem.Len() {
+						return nil, errors.Errorf("index out of range")
 					}
 					elem = elem.Index(indexInt)
 					if !elem.CanSet() {
@@ -741,7 +787,11 @@ func (scope *Scope) Interpret(expr ast.Node) (interface{}, error) {
 		if err != nil {
 			return nil, err
 		}
-		succeeded := reflect.ValueOf(channel).TrySend(reflect.ValueOf(val))
+		chanV := reflect.ValueOf(channel)
+		if chanV.Kind() != reflect.Chan {
+			return nil, errors.Errorf("expected chan; got %#v", channel)
+		}
+		succeeded := chanV.TrySend(reflect.ValueOf(val))
 		if !succeeded {
 			return nil, ErrChanSendFailed
 		}
@@ -961,7 +1011,11 @@ func (scope *Scope) ExecuteFunc(funExpr ast.Expr, args []interface{}) (interface
 
 	switch funV := fun.(type) {
 	case reflect.Type:
+		if len(args) != 1 {
+			return nil, errors.Errorf("expected args len = 1; args %#v", args)
+		}
 		return reflect.ValueOf(args[0]).Convert(funV).Interface(), nil
+
 	case *Func:
 		// TODO enforce func return values
 		currentScope := scope.NewChild()
@@ -988,9 +1042,17 @@ func (scope *Scope) ExecuteFunc(funExpr ast.Expr, args []interface{}) (interface
 
 	funVal := reflect.ValueOf(fun)
 
+	if funVal.Kind() != reflect.Func {
+		return nil, errors.Errorf("expected func; got %#v", fun)
+	}
+
 	var valueArgs []reflect.Value
 	for _, v := range args {
 		valueArgs = append(valueArgs, reflect.ValueOf(v))
+	}
+	funType := funVal.Type()
+	if (funType.NumIn() != len(valueArgs) && !funType.IsVariadic()) || (funType.IsVariadic() && len(valueArgs) < funType.NumIn()-1) {
+		return nil, errors.Errorf("number of arguments doesn't match function; expected %d; got %+v", funVal.Type().NumIn(), args)
 	}
 	values := ValuesToInterfaces(funVal.Call(valueArgs))
 	if len(values) == 0 {

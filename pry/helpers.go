@@ -1,9 +1,10 @@
 package pry
 
 import (
-	"errors"
 	"fmt"
 	"reflect"
+
+	"github.com/pkg/errors"
 )
 
 // Append is a runtime replacement for the append function
@@ -41,6 +42,9 @@ func Make(t interface{}, args ...interface{}) (interface{}, error) {
 				return nil, errors.New("len is not int")
 			}
 		}
+		if length < 0 || capacity < 0 {
+			return nil, errors.Errorf("negative length or capacity")
+		}
 		slice := reflect.MakeSlice(typ, length, capacity)
 		return slice.Interface(), nil
 
@@ -56,6 +60,9 @@ func Make(t interface{}, args ...interface{}) (interface{}, error) {
 			if !isInt {
 				return nil, errors.New("size is not int")
 			}
+		}
+		if size < 0 {
+			return nil, errors.Errorf("negative buffer size")
 		}
 		buffer := reflect.MakeChan(typ, size)
 		return buffer.Interface(), nil
