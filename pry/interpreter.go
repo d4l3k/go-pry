@@ -411,6 +411,9 @@ func (scope *Scope) Interpret(expr ast.Node) (interface{}, error) {
 		if !ok {
 			return nil, errors.Errorf("expected int; got %#v", len)
 		}
+		if lenI < 0 {
+			return nil, errors.Errorf("negative array size")
+		}
 		return reflect.ArrayOf(lenI, rType), nil
 
 	case *ast.MapType:
