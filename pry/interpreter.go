@@ -320,6 +320,11 @@ func (scope *Scope) Interpret(expr ast.Node) (interface{}, error) {
 			default:
 				return nil, errors.Errorf("unknown array type %#v", typ)
 			}
+
+			if len(e.Elts) > slice.Len() {
+				return nil, errors.Errorf("array index %d out of bounds [0:%d]", slice.Len(), slice.Len())
+			}
+
 			for i, elem := range e.Elts {
 				elemValue, err := scope.Interpret(elem)
 				if err != nil {
@@ -1036,7 +1041,7 @@ func (scope *Scope) ExecuteFunc(funExpr ast.Expr, args []interface{}) (interface
 		valueArgs = append(valueArgs, reflect.ValueOf(v))
 	}
 	funType := funVal.Type()
-	if funType.NumIn() != len(valueArgs) && !funType.IsVariadic() {
+	if (funType.NumIn() != len(valueArgs) && !funType.IsVariadic()) || (funType.IsVariadic() && len(valueArgs) < funType.NumIn()-1) {
 		return nil, errors.Errorf("number of arguments doesn't match function; expected %d; got %+v", funVal.Type().NumIn(), args)
 	}
 	values := ValuesToInterfaces(funVal.Call(valueArgs))
