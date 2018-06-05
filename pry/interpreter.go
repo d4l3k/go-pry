@@ -93,7 +93,11 @@ func (scope *Scope) Get(name string) (interface{}, bool) {
 	if !exists || val == nil {
 		return val, exists
 	}
-	return reflect.ValueOf(val).Elem().Interface(), exists
+	v := reflect.ValueOf(val)
+	if v.Kind() == reflect.Ptr {
+		return v.Elem().Interface(), exists
+	}
+	return v.Interface(), exists
 }
 
 // Set walks the scope and sets a value in a parent scope if it exists, else current.

@@ -97,7 +97,18 @@ func InjectPry(filePath string) (string, error) {
 
 	for _, f := range funcs {
 		vars = append(vars, f.Name.Name)
-		extractVariables(vars, f.Body.List)
+		if f.Recv != nil {
+			vars = extractFields(vars, f.Recv.List)
+		}
+		if f.Type != nil {
+			if f.Type.Params != nil {
+				vars = extractFields(vars, f.Type.Params.List)
+			}
+			if f.Type.Results != nil {
+				vars = extractFields(vars, f.Type.Results.List)
+			}
+		}
+		vars = extractVariables(vars, f.Body.List)
 	}
 
 	fileTextBytes, err := ioutil.ReadFile(filePath)
@@ -388,6 +399,13 @@ func filterVars(vars []string) (fVars []string) {
 func extractVariables(vars []string, l []ast.Stmt) []string {
 	for _, s := range l {
 		vars = handleStatement(vars, s)
+	}
+	return vars
+}
+
+func extractFields(vars []string, l []*ast.Field) []string {
+	for _, s := range l {
+		vars = handleIdents(vars, s.Names)
 	}
 	return vars
 }
