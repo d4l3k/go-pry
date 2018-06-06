@@ -5,7 +5,7 @@ package pry
 import (
 	"go/types"
 
-	gcimporter "golang.org/x/tools/go/gcimporter15"
+	gcimporter "golang.org/x/tools/go/internal/gcimporter"
 )
 
 func getImporter() types.ImporterFrom {
