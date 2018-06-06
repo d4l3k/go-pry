@@ -19,7 +19,7 @@ Example
 Install go-pry
 ```bash
 go get github.com/d4l3k/go-pry
-go install github.com/d4l3k/go-pry
+go install -i github.com/d4l3k/go-pry
 
 ```
 
