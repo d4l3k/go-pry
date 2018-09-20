@@ -150,7 +150,7 @@ func InjectPry(filePath string) (string, error) {
 }
 
 // GenerateFile generates and executes a temp file with the given imports
-func GenerateFile(imports []string) error {
+func GenerateFile(imports []string, extraStatements string) error {
 	dir, err := ioutil.TempDir("", "pry")
 	if err != nil {
 		return err
@@ -159,7 +159,7 @@ func GenerateFile(imports []string) error {
 	for _, imp := range imports {
 		file += fmt.Sprintf("\t%#v\n", imp)
 	}
-	file += ")\nfunc main() {\n\tpry.Pry()\n}"
+	file += ")\nfunc main() {\n\t" + extraStatements + "\n\tpry.Pry()\n}\n"
 
 	newPath := dir + "/main.go"
 	ioutil.WriteFile(newPath, []byte(file), 0644)
@@ -186,6 +186,7 @@ func main() {
 	// FLAGS
 	imports := flag.String("i", "fmt,math", "packages to import, comma seperated")
 	revert := flag.Bool("r", true, "whether to revert changes on exit")
+	execute := flag.String("e", "", "statements to execute")
 	flag.BoolVar(&debug, "d", false, "display debug statements")
 
 	flag.CommandLine.Usage = func() {
@@ -201,7 +202,7 @@ func main() {
 	flag.Parse()
 	cmdArgs := flag.Args()
 	if len(cmdArgs) == 0 {
-		err := GenerateFile(strings.Split(*imports, ","))
+		err := GenerateFile(strings.Split(*imports, ","), *execute)
 		if err != nil {
 			panic(err)
 		}

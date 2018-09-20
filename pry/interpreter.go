@@ -574,7 +574,7 @@ func (scope *Scope) Interpret(expr ast.Node) (interface{}, error) {
 		}
 
 		if len(rhs) != len(e.Lhs) {
-			return nil, fmt.Errorf("assignment count mismatch: %d = %d", len(e.Lhs), len(rhs))
+			return nil, fmt.Errorf("assignment count mismatch: %d = %d (%+v)", len(e.Lhs), len(rhs), rhs)
 		}
 
 		for i, id := range e.Lhs {
