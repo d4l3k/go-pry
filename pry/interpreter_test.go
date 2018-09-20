@@ -664,6 +664,29 @@ func TestAppend(t *testing.T) {
 	}
 }
 
+func TestMultiReturn(t *testing.T) {
+	t.Parallel()
+
+	scope := NewScope()
+	scope.Set("f", func() (int, error) {
+		return 0, nil
+	})
+
+	_, err := scope.InterpretString(`a, err := f()`)
+	if err != nil {
+		t.Error(err)
+	}
+	expected := 0
+	outV, found := scope.Get("a")
+	if !found {
+		t.Errorf("failed to find \"a\"")
+	}
+	out := outV.(int)
+	if !reflect.DeepEqual(expected, out) {
+		t.Errorf("Expected %#v got %#v.", expected, out)
+	}
+}
+
 func TestDeclareAssignVar(t *testing.T) {
 	t.Parallel()
 
