@@ -569,12 +569,12 @@ func (scope *Scope) Interpret(expr ast.Node) (interface{}, error) {
 			rhs = rhs[:0]
 
 			for i := 0; i < rhsLen; i++ {
-				rhs[i] = rhsV.Index(i).Interface()
+				rhs = append(rhs, rhsV.Index(i).Interface())
 			}
 		}
 
 		if len(rhs) != len(e.Lhs) {
-			return nil, fmt.Errorf("assignment count mismatch: %d = %d", len(e.Lhs), len(rhs))
+			return nil, fmt.Errorf("assignment count mismatch: %d = %d (%+v)", len(e.Lhs), len(rhs), rhs)
 		}
 
 		for i, id := range e.Lhs {
@@ -1059,13 +1059,21 @@ func (scope *Scope) ExecuteFunc(funExpr ast.Expr, args []interface{}) (interface
 		return nil, errors.Errorf("number of arguments doesn't match function; expected %d; got %+v", funVal.Type().NumIn(), args)
 	}
 	values := ValuesToInterfaces(funVal.Call(valueArgs))
+	if len(values) > 0 {
+		if last, ok := values[len(values)-1].(*InterpretError); ok {
+			values = values[:len(values)-1]
+			if err := last.Error(); err != nil {
+				return nil, err
+			}
+		}
+	}
+
 	if len(values) == 0 {
 		return nil, nil
 	} else if len(values) == 1 {
 		return values[0], nil
 	}
-	err, _ = values[1].(error)
-	return values[0], err
+	return values, nil
 }
 
 // ConfigureTypes configures the scope type checker
