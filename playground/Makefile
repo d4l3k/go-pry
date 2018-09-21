@@ -7,6 +7,11 @@ build: wasm_exec.js
 	go-pry -generate="stdlib.go" -i="$(shell tr '\n' ',' < packages.txt)" -e='log.Println("Hello world!")'
 	GOOS=js GOARCH=wasm go build -v -ldflags "-s -w" -o stdlib.wasm stdlib.go
 
+.PHONY: run
+run:
+	RUN CGO_ENABLED=0 go build -ldflags "-s -w" -o server ./server
+	./server
+
 wasm_exec.js: $(shell go env GOROOT)/misc/wasm/wasm_exec.js
 	cp $< .
 

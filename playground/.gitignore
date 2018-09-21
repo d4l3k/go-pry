@@ -4,3 +4,4 @@ node_modules/
 *.gopry
 main.go
 stdlib.go
+server
