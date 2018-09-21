@@ -150,24 +150,32 @@ func InjectPry(filePath string) (string, error) {
 }
 
 // GenerateFile generates and executes a temp file with the given imports
-func GenerateFile(imports []string, extraStatements string) error {
-	dir, err := ioutil.TempDir("", "pry")
-	if err != nil {
-		return err
+func GenerateFile(imports []string, extraStatements, generatePath string) error {
+	newPath := generatePath
+	if len(generatePath) == 0 {
+		dir, err := ioutil.TempDir("", "pry")
+		if err != nil {
+			return err
+		}
+		defer func() {
+			if err := os.RemoveAll(dir); err != nil {
+				log.Fatal(err)
+			}
+		}()
+		newPath = dir + "/main.go"
 	}
+
 	file := "package main\nimport (\n\t\"github.com/d4l3k/go-pry/pry\"\n\n"
 	for _, imp := range imports {
 		file += fmt.Sprintf("\t%#v\n", imp)
 	}
 	file += ")\nfunc main() {\n\t" + extraStatements + "\n\tpry.Pry()\n}\n"
 
-	newPath := dir + "/main.go"
 	ioutil.WriteFile(newPath, []byte(file), 0644)
 	InjectPry(newPath)
-	ExecuteGoCmd([]string{"run", newPath})
-	err = os.RemoveAll(dir)
-	if err != nil {
-		return err
+
+	if len(generatePath) == 0 {
+		ExecuteGoCmd([]string{"run", newPath})
 	}
 	return nil
 }
@@ -187,6 +195,7 @@ func main() {
 	imports := flag.String("i", "fmt,math", "packages to import, comma seperated")
 	revert := flag.Bool("r", true, "whether to revert changes on exit")
 	execute := flag.String("e", "", "statements to execute")
+	generatePath := flag.String("generate", "", "the path to generate a go-pry injected file - EXPERIMENTAL")
 	flag.BoolVar(&debug, "d", false, "display debug statements")
 
 	flag.CommandLine.Usage = func() {
@@ -202,7 +211,7 @@ func main() {
 	flag.Parse()
 	cmdArgs := flag.Args()
 	if len(cmdArgs) == 0 {
-		err := GenerateFile(strings.Split(*imports, ","), *execute)
+		err := GenerateFile(strings.Split(*imports, ","), *execute, *generatePath)
 		if err != nil {
 			panic(err)
 		}

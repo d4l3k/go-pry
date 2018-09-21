@@ -1088,7 +1088,7 @@ func (scope *Scope) ConfigureTypes(path string, line int) error {
 
 	// Parse the file containing this very example
 	// but stop after processing the imports.
-	f, err := parser.ParseDir(scope.fset, filepath.Dir(scope.path), nil, 0)
+	f, err := scope.parseDir()
 	if err != nil {
 		return errors.Wrapf(err, "parser.ParseDir %q", scope.path)
 	}

@@ -6,7 +6,6 @@ import (
 	"io"
 	"io/ioutil"
 	"log"
-	"os"
 	"path"
 	"path/filepath"
 	"runtime"
@@ -14,8 +13,6 @@ import (
 
 	"go/ast"
 
-	"github.com/mattn/go-colorable"
-	gotty "github.com/mattn/go-tty"
 	"github.com/mgutz/ansi"
 	homedir "github.com/mitchellh/go-homedir"
 )
@@ -69,14 +66,7 @@ func Pry(v ...interface{}) {
 
 // Apply drops into a pry shell in the location required.
 func Apply(scope *Scope) {
-	var out io.Writer = os.Stdout
-	if runtime.GOOS == "windows" {
-		out = colorable.NewColorableStdout()
-	}
-	tty, err := gotty.Open()
-	if err != nil {
-		panic(err)
-	}
+	out, tty := openTTY()
 	defer tty.Close()
 
 	_, filePathRaw, lineNum, _ := runtime.Caller(1)
@@ -90,6 +80,7 @@ func Apply(scope *Scope) {
 type genericTTY interface {
 	ReadRune() (rune, error)
 	Size() (int, int, error)
+	Close() error
 }
 
 func apply(

@@ -114,9 +114,9 @@ func (t *testTTY) Size() (int, int, error) {
 	return 10000, 100, nil
 }
 
-func (t *testTTY) Close() {
+func (t *testTTY) Close() error {
 	t.PipeReader.Close()
-	t.PipeWriter.Close()
+	return t.PipeWriter.Close()
 }
 
 type testPryEnv struct {
