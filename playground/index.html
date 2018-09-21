@@ -4,6 +4,8 @@
     <meta charset="utf-8">
     <link href="https://fonts.googleapis.com/css?family=Source+Code+Pro:400,700|Source+Sans+Pro:400,700" rel="stylesheet">
     <link rel="stylesheet" href="node_modules/xterm/dist/xterm.css" />
+    <link rel="stylesheet" href="node_modules/nprogress/nprogress.css"/>
+
     <style>
       body {
 	color: white;
@@ -61,7 +63,9 @@
     <p>Created by <a href="https://fn.lc">Tristan Rice</a>.</p>
 
 
-    <script src="node_modules/xterm/dist/xterm.js"></script><Paste>
+    <script src="node_modules/nprogress/nprogress.js"></script>
+    <script>NProgress.start()</script>
+    <script src="node_modules/xterm/dist/xterm.js"></script>
     <script src="wasm_exec.js"></script>
     <script>
 
@@ -88,6 +92,7 @@
 
 	const go = new Go();
 	WebAssembly.instantiateStreaming(wasm, go.importObject).then((result) => {
+	  NProgress.done()
 	  go.run(result.instance);
 	});
       })
