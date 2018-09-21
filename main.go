@@ -186,6 +186,8 @@ func GenerateFile(imports []string, extraStatements, generatePath string) error 
 var debug bool
 
 func main() {
+	log.SetFlags(log.Flags() | log.Lshortfile)
+
 	// Catch Ctrl-C
 	c := make(chan os.Signal, 1)
 	signal.Notify(c, os.Interrupt)
@@ -368,13 +370,20 @@ func GetExports(importName string, pkg *ast.Package, added map[string]bool) stri
 						}
 				*/
 				case *ast.TypeSpec:
-					out, err := scope.Interpret(stmt.Type)
-					if err != nil {
-						Debug("TypeSpec ERR %s\n", err.Error())
-						//continue
-					} else {
-						scope.Set(obj.Name, out)
+					switch typ := stmt.Type.(type) {
+					case *ast.StructType:
 						isType = true
+						scope.Set(obj.Name, typ)
+
+					default:
+						out, err := scope.Interpret(stmt.Type)
+						if err != nil {
+							Debug("TypeSpec ERR %s\n", err.Error())
+							//continue
+						} else {
+							scope.Set(obj.Name, out)
+							isType = true
+						}
 					}
 				}
 
@@ -383,12 +392,19 @@ func GetExports(importName string, pkg *ast.Package, added map[string]bool) stri
 					vars += "\"" + k + "\": "
 					if isType {
 						out, _ := scope.Get(obj.Name)
-						zero := reflect.Zero(out.(reflect.Type)).Interface()
-						val := fmt.Sprintf("%#v", zero)
-						if zero == nil {
-							val = "nil"
+						switch v := out.(type) {
+						case reflect.Type:
+							zero := reflect.Zero(v).Interface()
+							val := fmt.Sprintf("%#v", zero)
+							if zero == nil {
+								val = "nil"
+							}
+							vars += fmt.Sprintf("pry.Type(%s(%s))", path, val)
+						case *ast.StructType:
+							vars += fmt.Sprintf("pry.Type(%s{})", path)
+						default:
+							log.Fatalf("got unknown type: %T %+v", out, out)
 						}
-						vars += fmt.Sprintf("pry.Type(%s(%s))", path, val)
 
 						// TODO Fix hack for very large constants
 					} else if path == "math.MaxUint64" || path == "crc64.ISO" || path == "crc64.ECMA" {
@@ -397,6 +413,9 @@ func GetExports(importName string, pkg *ast.Package, added map[string]bool) stri
 						vars += path
 					}
 					vars += ","
+					if debug {
+						vars += "\n"
+					}
 				}
 			}
 		}

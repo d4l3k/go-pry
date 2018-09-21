@@ -191,7 +191,7 @@ func (scope *Scope) ParseString(exprStr string) (ast.Node, int, error) {
 func (scope *Scope) InterpretString(exprStr string) (v interface{}, err error) {
 	defer func() {
 		if r := recover(); r != nil {
-			err = errors.Errorf(fmt.Sprint(r))
+			err = errors.Errorf("interpreting %q: %s", exprStr, fmt.Sprint(r))
 		}
 	}()
 
@@ -364,6 +364,32 @@ func (scope *Scope) Interpret(expr ast.Node) (interface{}, error) {
 				}
 			}
 			return nMap.Interface(), nil
+
+		case *ast.Ident, *ast.SelectorExpr:
+			objPtr := reflect.New(typ.(reflect.Type))
+			obj := objPtr.Elem()
+			for i, elem := range e.Elts {
+				switch eT := elem.(type) {
+				case *ast.BasicLit:
+					val, err := scope.Interpret(eT)
+					if err != nil {
+						return nil, err
+					}
+					obj.Field(i).Set(reflect.ValueOf(val))
+
+				case *ast.KeyValueExpr:
+					key := eT.Key.(*ast.Ident).Name
+					val, err := scope.Interpret(eT.Value)
+					if err != nil {
+						return nil, err
+					}
+					obj.FieldByName(key).Set(reflect.ValueOf(val))
+
+				default:
+					return nil, fmt.Errorf("invalid element type %T %#v to struct literal", eT, eT)
+				}
+			}
+			return obj.Interface(), nil
 
 		default:
 			return nil, fmt.Errorf("unknown composite literal %#v", t)
