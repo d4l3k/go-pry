@@ -60,7 +60,7 @@
       <ul>
 	<li><a href="/">just fmt,log,math</a></li>
 	<li>
-	  <a href="/?file=stdlib.wasm">full standard library</a>
+	  <a href="/?file=bundles/stdlib.wasm">full standard library</a>
 	  (~37MB, will take longer to load)
 	</li>
       </ul>
@@ -76,7 +76,7 @@
     <script>
 
       const file = (new URL(document.location)).searchParams.get('file')
-      const wasm = fetch(file || "main.wasm")
+      const wasm = fetch(file || "bundles/main.wasm")
 
       document.fonts.ready.then(() => {
 	const term = new Terminal({

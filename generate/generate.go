@@ -23,11 +23,13 @@ import (
 type Generator struct {
 	contexts []pryContext
 	debug    bool
+	Build    build.Context
 }
 
 func NewGenerator(debug bool) *Generator {
 	return &Generator{
 		debug: debug,
+		Build: build.Default,
 	}
 }
 
@@ -40,9 +42,9 @@ func (g Generator) Debug(templ string, k ...interface{}) {
 
 // ExecuteGoCmd runs the 'go' command with certain parameters.
 func (g *Generator) ExecuteGoCmd(ctx context.Context, args []string, env []string) error {
-	binary, lookErr := exec.LookPath("go")
-	if lookErr != nil {
-		panic(lookErr)
+	binary, err := exec.LookPath("go")
+	if err != nil {
+		return err
 	}
 
 	cmd := exec.CommandContext(ctx, binary, args...)
@@ -77,9 +79,9 @@ func (g *Generator) InjectPry(filePath string) (string, error) {
 		importStr := imp.Path.Value[1 : len(imp.Path.Value)-1]
 		if importStr != "../pry" {
 			dir := filepath.Dir(filePath)
-			pkg, err := build.Import(importStr, dir, build.AllowBinary)
+			pkg, err := g.Build.Import(importStr, dir, build.AllowBinary)
 			if err != nil {
-				panic(err)
+				return "", err
 			}
 			importName := pkg.Name
 			if imp.Name != nil {
@@ -87,12 +89,16 @@ func (g *Generator) InjectPry(filePath string) (string, error) {
 			}
 			pkgAst, err := parser.ParseDir(fset, pkg.Dir, nil, parser.ParseComments)
 			if err != nil {
-				panic(err)
+				return "", err
 			}
 			pair := "\"" + importName + "\": pry.Package{Name: \"" + pkg.Name + "\", Functions: map[string]interface{}{"
 			added := make(map[string]bool)
 			for _, nPkg := range pkgAst {
-				pair += g.GetExports(importName, nPkg, added)
+				exports, err := g.GetExports(importName, nPkg, added)
+				if err != nil {
+					return "", err
+				}
+				pair += exports
 			}
 			pair += "}}, "
 			packagePairs = append(packagePairs, pair)
@@ -167,9 +173,9 @@ func (g *Generator) InjectPry(filePath string) (string, error) {
 }
 
 // GetExports returns a string of gocode that represents the exports (constants/functions) of an ast.Package.
-func (g *Generator) GetExports(importName string, pkg *ast.Package, added map[string]bool) string {
+func (g *Generator) GetExports(importName string, pkg *ast.Package, added map[string]bool) (string, error) {
 	if pkg.Name == "main" {
-		return ""
+		return "", nil
 	}
 	vars := ""
 	for name, file := range pkg.Files {
@@ -177,9 +183,9 @@ func (g *Generator) GetExports(importName string, pkg *ast.Package, added map[st
 			continue
 		}
 
-		match, err := build.Default.MatchFile(path.Dir(name), path.Base(name))
+		match, err := g.Build.MatchFile(path.Dir(name), path.Base(name))
 		if err != nil {
-			panic(err)
+			return "", err
 		}
 		if !match {
 			continue
@@ -261,7 +267,7 @@ func (g *Generator) GetExports(importName string, pkg *ast.Package, added map[st
 			}
 		}
 	}
-	return vars
+	return vars, nil
 }
 
 // GenerateFile generates a injected file.

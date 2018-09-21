@@ -11,7 +11,7 @@ import (
 )
 
 func readFile(path string) ([]byte, error) {
-	path = filepath.Base(path)
+	path = filepath.Join("bundles", filepath.Base(path))
 
 	r, w := io.Pipe()
 	var respCB js.Callback

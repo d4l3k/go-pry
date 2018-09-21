@@ -2,6 +2,5 @@ wasm_exec.js
 node_modules/
 *.wasm
 *.gopry
-main.go
-stdlib.go
-server
+bundles/
+playground
