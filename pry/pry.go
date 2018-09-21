@@ -1,12 +1,8 @@
 package pry
 
 import (
-	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
-	"log"
-	"path"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -14,51 +10,7 @@ import (
 	"go/ast"
 
 	"github.com/mgutz/ansi"
-	homedir "github.com/mitchellh/go-homedir"
 )
-
-var historyFile = ".go-pry_history"
-
-func historyPath() (string, error) {
-	dir, err := homedir.Dir()
-	if err != nil {
-		return "", err
-	}
-	return path.Join(dir, historyFile), nil
-}
-
-func loadHistory() []string {
-	path, err := historyPath()
-	if err != nil {
-		log.Printf("Error finding user home dir: %s", err)
-		return nil
-	}
-	body, err := ioutil.ReadFile(path)
-	if err != nil {
-		return nil
-	}
-	var history []string
-	if err := json.Unmarshal(body, &history); err != nil {
-		log.Printf("Error reading history file! %s", err)
-		return nil
-	}
-	return history
-}
-
-func saveHistory(history *[]string) {
-	body, err := json.Marshal(history)
-	if err != nil {
-		log.Printf("Err marshalling history: %s", err)
-	}
-	path, err := historyPath()
-	if err != nil {
-		log.Printf("Error finding user home dir: %s", err)
-		return
-	}
-	if err := ioutil.WriteFile(path, body, 0755); err != nil {
-		log.Printf("Error writing history: %s", err)
-	}
-}
 
 // Pry does nothing. It only exists so running code without go-pry doesn't throw an error.
 func Pry(v ...interface{}) {
@@ -101,7 +53,6 @@ func apply(
 	displayFilePosition(out, filePathRaw, filePath, lineNum)
 
 	history := loadHistory()
-	defer saveHistory(&history)
 
 	currentPos := len(history)
 
@@ -201,6 +152,8 @@ func apply(
 				fmt.Fprintf(out, "=> %s\n", respStr)
 			}
 			history = append(history, line)
+			saveHistory(&history)
+
 			count++
 			currentPos = count
 			line = ""
@@ -216,7 +169,7 @@ func displayFilePosition(
 	out io.Writer, filePathRaw, filePath string, lineNum int,
 ) {
 	fmt.Fprintf(out, "\nFrom %s @ line %d :\n\n", filePathRaw, lineNum)
-	file, err := ioutil.ReadFile(filePath)
+	file, err := readFile(filePath)
 	if err != nil {
 		fmt.Fprintln(out, err)
 	}

@@ -11,6 +11,7 @@ import (
 var tty = newWASMTTY()
 
 func newWASMTTY() *wasmTTY {
+
 	r, w := io.Pipe()
 	t := &wasmTTY{
 		term: js.Global().Get("term"),
@@ -21,6 +22,7 @@ func newWASMTTY() *wasmTTY {
 		w.Write([]byte(data))
 	})
 	t.term.Call("on", "data", cb)
+
 	return t
 }
 

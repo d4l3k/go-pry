@@ -17,6 +17,8 @@
       }
       #terminal {
 	display: inline-block;
+      }
+      pre {
 	font-family: 'Source Code Pro';
       }
       a {
@@ -37,9 +39,12 @@
 
     <p>Created by <a href="https://fn.lc">Tristan Rice</a>.</p>
 
+    <pre>hello! 👋</pre>
+
     <script src="node_modules/xterm/dist/xterm.js"></script><Paste>
     <script src="wasm_exec.js"></script>
     <script>
+
       const wasm = fetch("main.wasm")
 
       document.fonts.ready.then(() => {
@@ -52,9 +57,16 @@
 	window.term = term;
 	term.open(document.getElementById('terminal'));
 
+	console.stdlog = console.log.bind(console);
+	console.log = function(){
+	  term.write(Array.from(arguments).join(' ') + '\n');
+	  console.stdlog.apply(console, arguments);
+	}
+
+	console.log('Loading...')
+
 	const go = new Go();
 	WebAssembly.instantiateStreaming(wasm, go.importObject).then((result) => {
-	  console.log('running', result)
 	  go.run(result.instance);
 	});
       })
