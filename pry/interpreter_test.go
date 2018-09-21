@@ -792,6 +792,10 @@ func TestAssign(t *testing.T) {
 	scope := NewScope()
 	scope.Set("a", 1)
 
+	if _, err := scope.InterpretString(`b = 1`); err == nil {
+		t.Fatal("expected error")
+	}
+
 	out, err := scope.InterpretString(`a = 2`)
 	if err != nil {
 		t.Error(err)

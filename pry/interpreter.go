@@ -7,7 +7,6 @@ import (
 	"go/parser"
 	"go/printer"
 	"go/token"
-	"log"
 	"path/filepath"
 	"reflect"
 	"strconv"
@@ -625,7 +624,11 @@ func (scope *Scope) Interpret(expr ast.Node) (interface{}, error) {
 			}
 
 			if ident, ok := id.(*ast.Ident); ok {
-				val, _ := scope.Get(ident.Name)
+				val, exists := scope.Get(ident.Name)
+				if !exists && (e.Tok != token.DEFINE) {
+					return nil, errors.Errorf("undefined %s", ident.Name)
+				}
+
 				r, err := getR(val)
 				if err != nil {
 					return nil, err
@@ -1038,7 +1041,6 @@ func (scope *Scope) Interpret(expr ast.Node) (interface{}, error) {
 }
 
 func (scope *Scope) getValue(id ast.Expr) (reflect.Value, error) {
-	log.Printf("%T %+v", id, id)
 	switch id := id.(type) {
 	case *ast.Ident:
 		variable := id.Name
