@@ -188,7 +188,13 @@ func (scope *Scope) ParseString(exprStr string) (ast.Node, int, error) {
 }
 
 // InterpretString interprets a string of go code and returns the result.
-func (scope *Scope) InterpretString(exprStr string) (interface{}, error) {
+func (scope *Scope) InterpretString(exprStr string) (v interface{}, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			err = errors.Errorf(fmt.Sprint(r))
+		}
+	}()
+
 	node, _, err := scope.ParseString(exprStr)
 	if err != nil {
 		return node, err

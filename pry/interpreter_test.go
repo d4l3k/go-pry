@@ -1231,7 +1231,7 @@ func TestFunctionArgs(t *testing.T) {
 	scope := NewScope()
 
 	out, err := scope.InterpretString(`
-	f := func(b, c int) {
+	f := func(b, c int) int {
 		return b + c
 	}
 	f(10, 5)
@@ -1242,6 +1242,23 @@ func TestFunctionArgs(t *testing.T) {
 	expected := 15
 	if !reflect.DeepEqual(expected, out) {
 		t.Errorf("Expected %#v got %#v.", expected, out)
+	}
+}
+
+func TestFunctionArgsBad(t *testing.T) {
+	t.Parallel()
+
+	scope := NewScope()
+
+	scope.Set("f", func(b, c int) int {
+		return b + c
+	})
+
+	_, err := scope.InterpretString(`
+	f(10.0, "foo")
+	`)
+	if err == nil {
+		t.Fatalf("expected error")
 	}
 }
 
