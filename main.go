@@ -396,7 +396,7 @@ func GetExports(importName string, pkg *ast.Package, added map[string]bool) stri
 					} else {
 						vars += path
 					}
-					vars += ",\n"
+					vars += ","
 				}
 			}
 		}

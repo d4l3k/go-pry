@@ -1,19 +1,23 @@
-// +build !js
-
 package pry
 
 import (
 	"go/ast"
-	gcimporter "go/importer"
-	"go/parser"
 	"go/types"
-	"path/filepath"
+
+	"github.com/pkg/errors"
 )
 
-func getImporter() types.Importer {
-	return gcimporter.Default()
+// JSImporter contains all the information needed to implement a types.Importer
+// in a javascript environment.
+type JSImporter struct {
+	packages map[string]*types.Package
+	Dir      map[string]*ast.Package
 }
 
-func (s *Scope) parseDir() (map[string]*ast.Package, error) {
-	return parser.ParseDir(s.fset, filepath.Dir(s.path), nil, 0)
+func (i *JSImporter) Import(path string) (*types.Package, error) {
+	p, ok := i.packages[path]
+	if !ok {
+		return nil, errors.Errorf("package %q not found", path)
+	}
+	return p, nil
 }
