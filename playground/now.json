@@ -1,0 +1,14 @@
+{
+  "name": "go-pry",
+  "type": "static",
+  "alias": "gopry.rice.sh",
+  "files": [
+    "node_modules",
+    "main.wasm",
+    "wasm_exec.js",
+    "index.html",
+    ".main.gopry"
+  ],
+  "public": true
+}
+

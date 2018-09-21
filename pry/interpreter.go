@@ -188,7 +188,13 @@ func (scope *Scope) ParseString(exprStr string) (ast.Node, int, error) {
 }
 
 // InterpretString interprets a string of go code and returns the result.
-func (scope *Scope) InterpretString(exprStr string) (interface{}, error) {
+func (scope *Scope) InterpretString(exprStr string) (v interface{}, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			err = errors.Errorf(fmt.Sprint(r))
+		}
+	}()
+
 	node, _, err := scope.ParseString(exprStr)
 	if err != nil {
 		return node, err
@@ -1088,7 +1094,7 @@ func (scope *Scope) ConfigureTypes(path string, line int) error {
 
 	// Parse the file containing this very example
 	// but stop after processing the imports.
-	f, err := parser.ParseDir(scope.fset, filepath.Dir(scope.path), nil, 0)
+	f, err := scope.parseDir()
 	if err != nil {
 		return errors.Wrapf(err, "parser.ParseDir %q", scope.path)
 	}
