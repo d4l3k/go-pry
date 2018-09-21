@@ -4,6 +4,8 @@
     <meta charset="utf-8">
     <link href="https://fonts.googleapis.com/css?family=Source+Code+Pro:400,700|Source+Sans+Pro:400,700" rel="stylesheet">
     <link rel="stylesheet" href="node_modules/xterm/dist/xterm.css" />
+    <link rel="stylesheet" href="node_modules/nprogress/nprogress.css"/>
+
     <style>
       body {
 	color: white;
@@ -17,6 +19,7 @@
       }
       #terminal {
 	display: inline-block;
+	max-width: 100%;
       }
       pre, h2 {
 	font-family: 'Source Code Pro';
@@ -45,14 +48,19 @@
       <h2>hello!<b> </b>👋</h2>
       <p>This is a version of <a href="https://github.com/d4l3k/go-pry">go-pry</a>
       that runs in your browser using WebAssembly! It's missing a few features
-      like advanced auto complete since the browser doesn't have filesystem
-      access.</p>
+      but works pretty well for the most part.</p>
+
+      <p>This sometimes takes quite a while to load in Chrome, but it's almost
+      instant in Firefox.</p>
+
+      <p>I'm pretty excited to try using this to demo popular client
+      libraries.</p>
 
       <h2>go-pry import bundles</h2>
       <ul>
 	<li><a href="/">just fmt,log,math</a></li>
 	<li>
-	  <a href="/?file=stdlib.wasm">full standard library</a>
+	  <a href="/?file=bundles/stdlib.wasm">full standard library</a>
 	  (~37MB, will take longer to load)
 	</li>
       </ul>
@@ -61,12 +69,14 @@
     <p>Created by <a href="https://fn.lc">Tristan Rice</a>.</p>
 
 
-    <script src="node_modules/xterm/dist/xterm.js"></script><Paste>
+    <script src="node_modules/nprogress/nprogress.js"></script>
+    <script>NProgress.start()</script>
+    <script src="node_modules/xterm/dist/xterm.js"></script>
     <script src="wasm_exec.js"></script>
     <script>
 
       const file = (new URL(document.location)).searchParams.get('file')
-      const wasm = fetch(file || "main.wasm")
+      const wasm = fetch(file || "bundles/main.wasm")
 
       document.fonts.ready.then(() => {
 	const term = new Terminal({
@@ -88,6 +98,7 @@
 
 	const go = new Go();
 	WebAssembly.instantiateStreaming(wasm, go.importObject).then((result) => {
+	  NProgress.done()
 	  go.run(result.instance);
 	});
       })

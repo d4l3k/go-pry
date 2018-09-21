@@ -1,15 +1,14 @@
 {
   "name": "go-pry",
-  "type": "static",
+  "type": "docker",
   "alias": "gopry.rice.sh",
   "files": [
     "index.html",
     "node_modules",
     "wasm_exec.js",
-    "main.wasm",
-    ".main.gopry",
-    "stdlib.wasm",
-    ".stdlib.gopry"
+    "bundles",
+    "playground",
+    "Dockerfile"
   ],
   "public": true
 }
