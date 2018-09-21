@@ -87,7 +87,7 @@ func (scope *Scope) GetPointer(name string) (val interface{}, exists bool) {
 	return
 }
 
-// GetPointer walks the scope and finds the value of interest
+// Get walks the scope and finds the value of interest
 func (scope *Scope) Get(name string) (interface{}, bool) {
 	val, exists := scope.GetPointer(name)
 	if !exists || val == nil {
