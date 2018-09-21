@@ -3,11 +3,13 @@
   "type": "static",
   "alias": "gopry.rice.sh",
   "files": [
-    "node_modules",
-    "main.wasm",
-    "wasm_exec.js",
     "index.html",
-    ".main.gopry"
+    "node_modules",
+    "wasm_exec.js",
+    "main.wasm",
+    ".main.gopry",
+    "stdlib.wasm",
+    ".stdlib.gopry"
   ],
   "public": true
 }
