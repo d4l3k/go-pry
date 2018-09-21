@@ -409,6 +409,20 @@ func TestStructLiteralEmpty(t *testing.T) {
 	}
 }
 
+func TestStructSelectorAssignment(t *testing.T) {
+	scope := NewScope()
+	scope.Set("a", testStruct{})
+
+	out, err := scope.InterpretString(`a.A = 10; a`)
+	if err != nil {
+		t.Error(err)
+	}
+	expected := testStruct{A: 10}
+	if !reflect.DeepEqual(expected, out) {
+		t.Errorf("Expected %#v got %#v.", expected, out)
+	}
+}
+
 func TestSelectorFunc(t *testing.T) {
 	t.Parallel()
 
