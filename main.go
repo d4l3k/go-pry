@@ -167,6 +167,9 @@ func GenerateFile(imports []string, extraStatements, generatePath string) error 
 
 	file := "package main\nimport (\n\t\"github.com/d4l3k/go-pry/pry\"\n\n"
 	for _, imp := range imports {
+		if len(imp) == 0 {
+			continue
+		}
 		file += fmt.Sprintf("\t%#v\n", imp)
 	}
 	file += ")\nfunc main() {\n\t" + extraStatements + "\n\tpry.Pry()\n}\n"
@@ -381,15 +384,19 @@ func GetExports(importName string, pkg *ast.Package, added map[string]bool) stri
 					if isType {
 						out, _ := scope.Get(obj.Name)
 						zero := reflect.Zero(out.(reflect.Type)).Interface()
-						vars += fmt.Sprintf("pry.Type(%s(%#v))", path, zero)
+						val := fmt.Sprintf("%#v", zero)
+						if zero == nil {
+							val = "nil"
+						}
+						vars += fmt.Sprintf("pry.Type(%s(%s))", path, val)
 
-					} else if path == "math.MaxUint64" {
-						// TODO Fix hack for Uint64
-						vars += "uint64(math.MaxUint64)"
+						// TODO Fix hack for very large constants
+					} else if path == "math.MaxUint64" || path == "crc64.ISO" || path == "crc64.ECMA" {
+						vars += fmt.Sprintf("uint64(%s)", path)
 					} else {
 						vars += path
 					}
-					vars += ","
+					vars += ",\n"
 				}
 			}
 		}
