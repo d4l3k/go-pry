@@ -366,6 +366,63 @@ func TestSelector(t *testing.T) {
 		t.Errorf("Expected %#v got %#v.", expected, out)
 	}
 }
+
+func TestStructLiteral(t *testing.T) {
+	scope := NewScope()
+	scope.Set("a", Type(testStruct{}))
+
+	out, err := scope.InterpretString(`a{0, "a", "b"}`)
+	if err != nil {
+		t.Error(err)
+	}
+	expected := testStruct{0, "a", "b"}
+	if !reflect.DeepEqual(expected, out) {
+		t.Errorf("Expected %#v got %#v.", expected, out)
+	}
+}
+
+func TestStructLiteralNamed(t *testing.T) {
+	scope := NewScope()
+	scope.Set("a", Type(testStruct{}))
+
+	out, err := scope.InterpretString(`a{C: "c", A: 0}`)
+	if err != nil {
+		t.Error(err)
+	}
+	expected := testStruct{C: "c", A: 0}
+	if !reflect.DeepEqual(expected, out) {
+		t.Errorf("Expected %#v got %#v.", expected, out)
+	}
+}
+
+func TestStructLiteralEmpty(t *testing.T) {
+	scope := NewScope()
+	scope.Set("a", Type(testStruct{}))
+
+	out, err := scope.InterpretString(`a{}`)
+	if err != nil {
+		t.Error(err)
+	}
+	expected := testStruct{}
+	if !reflect.DeepEqual(expected, out) {
+		t.Errorf("Expected %#v got %#v.", expected, out)
+	}
+}
+
+func TestStructSelectorAssignment(t *testing.T) {
+	scope := NewScope()
+	scope.Set("a", testStruct{})
+
+	out, err := scope.InterpretString(`a.A = 10; a`)
+	if err != nil {
+		t.Error(err)
+	}
+	expected := testStruct{A: 10}
+	if !reflect.DeepEqual(expected, out) {
+		t.Errorf("Expected %#v got %#v.", expected, out)
+	}
+}
+
 func TestSelectorFunc(t *testing.T) {
 	t.Parallel()
 
@@ -734,6 +791,10 @@ func TestAssign(t *testing.T) {
 
 	scope := NewScope()
 	scope.Set("a", 1)
+
+	if _, err := scope.InterpretString(`b = 1`); err == nil {
+		t.Fatal("expected error")
+	}
 
 	out, err := scope.InterpretString(`a = 2`)
 	if err != nil {

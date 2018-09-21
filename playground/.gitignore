@@ -3,3 +3,4 @@ node_modules/
 *.wasm
 *.gopry
 main.go
+stdlib.go

@@ -87,7 +87,7 @@ func (scope *Scope) GetPointer(name string) (val interface{}, exists bool) {
 	return
 }
 
-// GetPointer walks the scope and finds the value of interest
+// Get walks the scope and finds the value of interest
 func (scope *Scope) Get(name string) (interface{}, bool) {
 	val, exists := scope.GetPointer(name)
 	if !exists || val == nil {
@@ -191,7 +191,7 @@ func (scope *Scope) ParseString(exprStr string) (ast.Node, int, error) {
 func (scope *Scope) InterpretString(exprStr string) (v interface{}, err error) {
 	defer func() {
 		if r := recover(); r != nil {
-			err = errors.Errorf(fmt.Sprint(r))
+			err = errors.Errorf("interpreting %q: %s", exprStr, fmt.Sprint(r))
 		}
 	}()
 
@@ -364,6 +364,32 @@ func (scope *Scope) Interpret(expr ast.Node) (interface{}, error) {
 				}
 			}
 			return nMap.Interface(), nil
+
+		case *ast.Ident, *ast.SelectorExpr:
+			objPtr := reflect.New(typ.(reflect.Type))
+			obj := objPtr.Elem()
+			for i, elem := range e.Elts {
+				switch eT := elem.(type) {
+				case *ast.BasicLit:
+					val, err := scope.Interpret(eT)
+					if err != nil {
+						return nil, err
+					}
+					obj.Field(i).Set(reflect.ValueOf(val))
+
+				case *ast.KeyValueExpr:
+					key := eT.Key.(*ast.Ident).Name
+					val, err := scope.Interpret(eT.Value)
+					if err != nil {
+						return nil, err
+					}
+					obj.FieldByName(key).Set(reflect.ValueOf(val))
+
+				default:
+					return nil, fmt.Errorf("invalid element type %T %#v to struct literal", eT, eT)
+				}
+			}
+			return obj.Interface(), nil
 
 		default:
 			return nil, fmt.Errorf("unknown composite literal %#v", t)
@@ -555,7 +581,7 @@ func (scope *Scope) Interpret(expr ast.Node) (interface{}, error) {
 
 	case *ast.AssignStmt:
 		// TODO implement type checking
-		define := e.Tok == token.DEFINE
+		//define := e.Tok == token.DEFINE
 		rhs := make([]interface{}, len(e.Rhs))
 		for i, expr := range e.Rhs {
 			val, err := scope.Interpret(expr)
@@ -584,66 +610,67 @@ func (scope *Scope) Interpret(expr ast.Node) (interface{}, error) {
 		}
 
 		for i, id := range e.Lhs {
-			r := rhs[i]
-			switch lhsExpr := id.(type) {
-			case *ast.Ident:
-				variable := lhsExpr.Name
-				current, exists := scope.Get(variable)
-				if !exists && !define {
-					return nil, fmt.Errorf("variable %#v is not defined", variable)
-				}
+			getR := func(val interface{}) (interface{}, error) {
+				r := rhs[i]
 				isModAssign := e.Tok != token.ASSIGN && e.Tok != token.DEFINE
 				if isModAssign {
 					var err error
-					r, err = ComputeBinaryOp(current, r, DeAssign(e.Tok))
+					r, err = ComputeBinaryOp(val, r, DeAssign(e.Tok))
 					if err != nil {
 						return nil, err
 					}
 				}
-				scope.Set(variable, r)
+				return r, nil
+			}
 
-			case *ast.IndexExpr:
-				ident, isIdent := lhsExpr.X.(*ast.Ident)
-				if !isIdent {
-					return nil, errors.Errorf("expected identifier; got %#v", lhsExpr.X)
+			if ident, ok := id.(*ast.Ident); ok {
+				val, exists := scope.Get(ident.Name)
+				if !exists && (e.Tok != token.DEFINE) {
+					return nil, errors.Errorf("undefined %s", ident.Name)
 				}
-				index, err := scope.Interpret(lhsExpr.Index)
+
+				r, err := getR(val)
 				if err != nil {
 					return nil, err
 				}
-				x, exists := scope.GetPointer(ident.Name)
-				if !exists {
-					return nil, errors.Errorf("variable %#v is not defined", ident.Name)
+				scope.Set(ident.Name, r)
+				continue
+			} else if idx, ok := id.(*ast.IndexExpr); ok {
+				left, err := scope.getValue(idx.X)
+				if err != nil {
+					return nil, err
 				}
-				elem := reflect.ValueOf(x).Elem()
-
-				switch elem.Kind() {
-				case reflect.Slice, reflect.Array:
-					indexInt, ok := index.(int)
-					if !ok {
-						return nil, errors.Errorf("expected index to be int, got %#v", index)
+				if left.Type().Kind() == reflect.Map {
+					index, err := scope.Interpret(idx.Index)
+					if err != nil {
+						return nil, err
 					}
-					if indexInt >= elem.Len() {
-						return nil, errors.Errorf("index out of range")
+					var val interface{}
+					leftV := left.MapIndex(reflect.ValueOf(index))
+					if leftV.IsValid() {
+						val = leftV.Interface()
+					} else {
+						val = reflect.Zero(left.Type().Elem()).Interface()
 					}
-					elem = elem.Index(indexInt)
-					if !elem.CanSet() {
-						return nil, errors.Errorf("can't set index on %#v", x)
+					r, err := getR(val)
+					if err != nil {
+						return nil, err
 					}
-					elem.Set(reflect.ValueOf(r))
-
-				case reflect.Map:
-					elem.SetMapIndex(reflect.ValueOf(index), reflect.ValueOf(r))
-
-				default:
-					return nil, errors.Errorf("unknown type of X %#v", lhsExpr)
+					left.SetMapIndex(reflect.ValueOf(index), reflect.ValueOf(r))
+					continue
 				}
-
-				return nil, nil
-
-			default:
-				return nil, errors.Errorf("unknown assignment expr %#v", id)
 			}
+
+			val, err := scope.getValue(id)
+			if err != nil {
+				return nil, err
+			}
+
+			r, err := getR(val.Interface())
+			if err != nil {
+				return nil, err
+			}
+			val.Set(reflect.ValueOf(r))
 		}
 
 		if len(rhs) > 1 {
@@ -1010,6 +1037,56 @@ func (scope *Scope) Interpret(expr ast.Node) (interface{}, error) {
 
 	default:
 		return nil, fmt.Errorf("unknown node %#v", e)
+	}
+}
+
+func (scope *Scope) getValue(id ast.Expr) (reflect.Value, error) {
+	switch id := id.(type) {
+	case *ast.Ident:
+		variable := id.Name
+		current, exists := scope.GetPointer(variable)
+		if !exists {
+			return reflect.Value{}, fmt.Errorf("variable %#v is not defined", variable)
+		}
+		return reflect.ValueOf(current).Elem(), nil
+
+	case *ast.IndexExpr:
+		index, err := scope.Interpret(id.Index)
+		if err != nil {
+			return reflect.Value{}, err
+		}
+		elem, err := scope.getValue(id.X)
+		if err != nil {
+			return reflect.Value{}, err
+		}
+
+		switch elem.Kind() {
+		case reflect.Slice, reflect.Array:
+			indexInt, ok := index.(int)
+			if !ok {
+				return reflect.Value{}, errors.Errorf("expected index to be int, got %#v", index)
+			}
+			if indexInt >= elem.Len() {
+				return reflect.Value{}, errors.Errorf("index out of range")
+			}
+			return elem.Index(indexInt), nil
+
+		case reflect.Map:
+			return elem.MapIndex(reflect.ValueOf(index)), nil
+
+		default:
+			return reflect.Value{}, errors.Errorf("unknown type of X %#v", id)
+		}
+
+	case *ast.SelectorExpr:
+		elem, err := scope.getValue(id.X)
+		if err != nil {
+			return reflect.Value{}, err
+		}
+		return elem.FieldByName(id.Sel.Name), nil
+
+	default:
+		return reflect.Value{}, errors.Errorf("unknown assignment expr %#v", id)
 	}
 }
 

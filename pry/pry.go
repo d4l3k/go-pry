@@ -208,11 +208,17 @@ func displaySuggestions(
 	line string,
 	index, promptWidth int,
 ) {
-	// Suggestions
-	suggestions, err := scope.SuggestionsGoCode(line, index)
+	var err error
+	var suggestions []string
+	if runtime.GOOS == "js" {
+		suggestions, err = scope.SuggestionsPry(line, index)
+	} else {
+		suggestions, err = scope.SuggestionsGoCode(line, index)
+	}
 	if err != nil {
 		suggestions = []string{"ERR", err.Error()}
 	}
+
 	maxLength := 0
 	if len(suggestions) > 10 {
 		suggestions = suggestions[:10]
