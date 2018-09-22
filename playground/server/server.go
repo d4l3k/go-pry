@@ -14,6 +14,7 @@ import (
 	"strings"
 
 	"github.com/d4l3k/go-pry/generate"
+	"github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
 	"github.com/pkg/errors"
 )
@@ -121,5 +122,6 @@ func run() error {
 	router.NotFoundHandler = http.FileServer(http.Dir("."))
 
 	log.Printf("Listening %s...", *bind)
-	return http.ListenAndServe(*bind, router)
+	r := handlers.CombinedLoggingHandler(os.Stderr, router)
+	return http.ListenAndServe(*bind, r)
 }
