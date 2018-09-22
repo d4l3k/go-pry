@@ -2,6 +2,7 @@
 build: wasm_exec.js
 	yarn install
 	go install -v ..
+	@rm -r bundles
 	mkdir -p bundles
 	go-pry -generate="bundles/main.go" -i="fmt,log,math" -e='log.Println("Hello world!")'
 	GOOS=js GOARCH=wasm go build -v -ldflags "-s -w" -o bundles/main.wasm bundles/main.go
