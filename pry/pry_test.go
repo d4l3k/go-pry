@@ -7,6 +7,7 @@ import (
 	"math/rand"
 	"os"
 	"path"
+	"path/filepath"
 	"reflect"
 	"testing"
 	"time"
@@ -17,19 +18,37 @@ import (
 )
 
 func TestHistory(t *testing.T) {
+	t.Parallel()
+
 	rand.Seed(time.Now().UnixNano())
 
-	historyFile = ".go-pry_history_test"
+	history := &IOHistory{}
+	history.FileName = ".go-pry_history_test"
+	history.FilePath = filepath.Join(os.TempDir(), history.FileName)
 
-	want := []string{
+	expected := []string{
 		"test",
 		fmt.Sprintf("rand: %d", rand.Int63()),
 	}
-	saveHistory(&want)
+	history.Add(expected[0])
+	history.Add(expected[1])
 
-	out := loadHistory()
-	if !reflect.DeepEqual(want, out) {
-		t.Errorf("loadHistory() = %+v; expected %+v", out, want)
+	if err := history.Save(); err != nil {
+		t.Error("Failed to save history")
+	}
+
+	if err := history.Load(); err != nil {
+		t.Error("Failed to load history")
+	}
+
+	if !reflect.DeepEqual(expected, history.Records) {
+		t.Errorf("history.Load() = %+v; expected %+v", history.Records, expected)
+	}
+
+	// delete test history file
+	err := os.Remove(history.FilePath)
+	if err != nil {
+		t.Error(err)
 	}
 }
 
