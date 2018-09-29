@@ -7,8 +7,8 @@
     "node_modules",
     "wasm_exec.js",
     "bundles",
-    "playground",
-    "Dockerfile"
+    "Dockerfile",
+    "server"
   ],
   "public": true
 }
