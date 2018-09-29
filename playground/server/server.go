@@ -19,6 +19,8 @@ import (
 	"github.com/pkg/errors"
 )
 
+const bundlesDir = "bundles"
+
 var bind = flag.String("bind", ":8080", "address to bind to")
 
 func main() {
@@ -48,8 +50,8 @@ func normalizePackages(packages string) []string {
 func generateBundle(w http.ResponseWriter, r *http.Request, packages string) (retErr error) {
 	pkgs := normalizePackages(packages)
 	hash := pkgHash(pkgs)
-	path := filepath.Join("bundles", hash+".wasm")
-	goPath := filepath.Join("bundles", hash+".go")
+	path := filepath.Join(bundlesDir, hash+".wasm")
+	goPath := filepath.Join(bundlesDir, hash+".go")
 	_, err := os.Stat(path)
 	if err == nil {
 		http.ServeFile(w, r, path)
