@@ -53,7 +53,7 @@ func (bh *BrowserHistory) Load() error {
 	}
 	var records []string
 	if err := json.Unmarshal([]byte(hist.String()), &records); err != nil {
-		panic(err)
+		return err
 	}
 	bh.Records = records
 
@@ -64,7 +64,7 @@ func (bh *BrowserHistory) Load() error {
 func (bh BrowserHistory) Save() error {
 	bytes, err := json.Marshal(bh.Records)
 	if err != nil {
-		panic(err)
+		return err
 	}
 	js.Global().Get("localStorage").Set("history", string(bytes))
 
