@@ -48,8 +48,7 @@ func NewHistory() (*BrowserHistory, error) {
 func (bh *BrowserHistory) Load() error {
 	hist := js.Global().Get("localStorage").Get("history")
 	if hist.Type() == js.TypeUndefined {
-		// dirty because it is actually an error
-		return nil
+		return nil // nothing to unmarashal
 	}
 	var records []string
 	if err := json.Unmarshal([]byte(hist.String()), &records); err != nil {
