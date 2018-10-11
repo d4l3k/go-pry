@@ -9,6 +9,7 @@ import (
 	"path"
 
 	homedir "github.com/mitchellh/go-homedir"
+	"github.com/pkg/errors"
 )
 
 var readFile = ioutil.ReadFile
@@ -40,13 +41,11 @@ func NewHistory() (*IOHistory, error) {
 func (h *IOHistory) Load() error {
 	body, err := ioutil.ReadFile(h.FilePath)
 	if err != nil {
-		log.Printf("History file not found! %s", err)
-		return err
+		return errors.Wrapf(err, "History file not found")
 	}
 	var records []string
 	if err := json.Unmarshal(body, &records); err != nil {
-		log.Printf("Error reading history file! %s", err)
-		return err
+		return errors.Wrapf(err, "Error reading history file")
 	}
 
 	h.Records = records
@@ -57,12 +56,10 @@ func (h *IOHistory) Load() error {
 func (h IOHistory) Save() error {
 	body, err := json.Marshal(h.Records)
 	if err != nil {
-		log.Printf("Err marshalling history: %s", err)
-		return err
+		return errors.Wrapf(err, "error marshaling history")
 	}
 	if err := ioutil.WriteFile(h.FilePath, body, 0755); err != nil {
-		log.Printf("Error writing history: %s", err)
-		return err
+		return errors.Wrapf(err, "error writing history to the file")
 	}
 
 	return nil
