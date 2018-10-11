@@ -57,7 +57,7 @@ func (bh *BrowserHistory) Load() error {
 	}
 	bh.Records = records
 
-	return true
+	return nil
 }
 
 // Save saves marshaled history's records into localStorage
