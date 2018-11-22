@@ -16,15 +16,15 @@ var readFile = ioutil.ReadFile
 
 var historyFile = ".go-pry_history"
 
-type IOHistory struct {
+type ioHistory struct {
 	FileName string
 	FilePath string
 	Records  []string
 }
 
-// NewHistory constructs IOHistory instance
-func NewHistory() (*IOHistory, error) {
-	h := IOHistory{}
+// NewHistory constructs ioHistory instance
+func NewHistory() (*ioHistory, error) {
+	h := ioHistory{}
 	h.FileName = historyFile
 
 	dir, err := homedir.Dir()
@@ -38,7 +38,7 @@ func NewHistory() (*IOHistory, error) {
 }
 
 // Load unmarshal history file into history's records
-func (h *IOHistory) Load() error {
+func (h *ioHistory) Load() error {
 	body, err := ioutil.ReadFile(h.FilePath)
 	if err != nil {
 		return errors.Wrapf(err, "History file not found")
@@ -53,7 +53,7 @@ func (h *IOHistory) Load() error {
 }
 
 // Save saves marshaled history's records into file
-func (h IOHistory) Save() error {
+func (h ioHistory) Save() error {
 	body, err := json.Marshal(h.Records)
 	if err != nil {
 		return errors.Wrapf(err, "error marshaling history")
@@ -66,9 +66,9 @@ func (h IOHistory) Save() error {
 }
 
 // Len returns amount of records in history
-func (h IOHistory) Len() int { return len(h.Records) }
+func (h ioHistory) Len() int { return len(h.Records) }
 
 // Add appends record into history's records
-func (h *IOHistory) Add(record string) {
+func (h *ioHistory) Add(record string) {
 	h.Records = append(h.Records, record)
 }
