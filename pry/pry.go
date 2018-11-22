@@ -52,12 +52,18 @@ func apply(
 
 	displayFilePosition(out, filePathRaw, filePath, lineNum)
 
-	history := loadHistory()
+	history, err := NewHistory()
+	if err != nil {
+		fmt.Errorf("Failed to initiliaze history %+v", err)
+	}
+	if err := history.Load(); err != nil {
+		fmt.Errorf("Failed to load the history %+v", err)
+	}
 
-	currentPos := len(history)
+	currentPos := history.Len()
 
 	line := ""
-	count := len(history)
+	count := history.Len()
 	index := 0
 	r := rune(0)
 	for {
@@ -85,13 +91,13 @@ func apply(
 				switch r {
 				case 66: // Down
 					currentPos++
-					if len(history) < currentPos {
-						currentPos = len(history)
+					if history.Len() < currentPos {
+						currentPos = history.Len()
 					}
-					if len(history) == currentPos {
+					if history.Len() == currentPos {
 						line = ""
 					} else {
-						line = history[currentPos]
+						line = history.Records[currentPos]
 					}
 					index = len(line)
 				case 65: // Up
@@ -99,8 +105,8 @@ func apply(
 					if currentPos < 0 {
 						currentPos = 0
 					}
-					if len(history) > 0 {
-						line = history[currentPos]
+					if history.Len() > 0 {
+						line = history.Records[currentPos]
 					}
 					index = len(line)
 				case 67: // Right
@@ -151,8 +157,11 @@ func apply(
 				respStr := Highlight(fmt.Sprintf("%#v", resp))
 				fmt.Fprintf(out, "=> %s\n", respStr)
 			}
-			history = append(history, line)
-			saveHistory(&history)
+			history.Add(line)
+			err = history.Save()
+			if err != nil {
+				fmt.Fprintln(out, "Error: ", err)
+			}
 
 			count++
 			currentPos = count

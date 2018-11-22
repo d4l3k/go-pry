@@ -31,22 +31,49 @@ func readFile(path string) ([]byte, error) {
 	return ioutil.ReadAll(r)
 }
 
-func loadHistory() []string {
-	hist := js.Global().Get("localStorage").Get("history")
-	if hist.Type() == js.TypeUndefined {
-		return nil
-	}
-	var history []string
-	if err := json.Unmarshal([]byte(hist.String()), &history); err != nil {
-		panic(err)
-	}
-	return history
+type BrowserHistory struct {
+	Records []string
 }
 
-func saveHistory(history *[]string) {
-	bytes, err := json.Marshal(history)
+// NewHistory constructs BrowserHistory instance
+func NewHistory() (*BrowserHistory, error) {
+
+	// FIXME:
+	// when localStorage is full, can be return an error
+
+	return &BrowserHistory{}, nil
+}
+
+// Load unmarshal localStorage data into history's records
+func (bh *BrowserHistory) Load() error {
+	hist := js.Global().Get("localStorage").Get("history")
+	if hist.Type() == js.TypeUndefined {
+		return nil // nothing to unmarashal
+	}
+	var records []string
+	if err := json.Unmarshal([]byte(hist.String()), &records); err != nil {
+		return err
+	}
+	bh.Records = records
+
+	return nil
+}
+
+// Save saves marshaled history's records into localStorage
+func (bh BrowserHistory) Save() error {
+	bytes, err := json.Marshal(bh.Records)
 	if err != nil {
-		panic(err)
+		return err
 	}
 	js.Global().Get("localStorage").Set("history", string(bytes))
+
+	return nil
+}
+
+// Len returns amount of records in history
+func (bh BrowserHistory) Len() int { return len(bh.Records) }
+
+// Add appends record into history's records
+func (bh *BrowserHistory) Add(record string) {
+	bh.Records = append(bh.Records, record)
 }

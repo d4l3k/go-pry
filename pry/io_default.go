@@ -9,49 +9,66 @@ import (
 	"path"
 
 	homedir "github.com/mitchellh/go-homedir"
+	"github.com/pkg/errors"
 )
 
 var readFile = ioutil.ReadFile
 
 var historyFile = ".go-pry_history"
 
-func historyPath() (string, error) {
+type IOHistory struct {
+	FileName string
+	FilePath string
+	Records  []string
+}
+
+// NewHistory constructs IOHistory instance
+func NewHistory() (*IOHistory, error) {
+	h := IOHistory{}
+	h.FileName = historyFile
+
 	dir, err := homedir.Dir()
 	if err != nil {
-		return "", err
+		log.Printf("Error finding user home dir: %s", err)
+		return nil, err
 	}
-	return path.Join(dir, historyFile), nil
+	h.FilePath = path.Join(dir, h.FileName)
+
+	return &h, nil
 }
 
-func loadHistory() []string {
-	path, err := historyPath()
+// Load unmarshal history file into history's records
+func (h *IOHistory) Load() error {
+	body, err := ioutil.ReadFile(h.FilePath)
 	if err != nil {
-		log.Printf("Error finding user home dir: %s", err)
-		return nil
+		return errors.Wrapf(err, "History file not found")
 	}
-	body, err := ioutil.ReadFile(path)
-	if err != nil {
-		return nil
+	var records []string
+	if err := json.Unmarshal(body, &records); err != nil {
+		return errors.Wrapf(err, "Error reading history file")
 	}
-	var history []string
-	if err := json.Unmarshal(body, &history); err != nil {
-		log.Printf("Error reading history file! %s", err)
-		return nil
-	}
-	return history
+
+	h.Records = records
+	return nil
 }
 
-func saveHistory(history *[]string) {
-	body, err := json.Marshal(history)
+// Save saves marshaled history's records into file
+func (h IOHistory) Save() error {
+	body, err := json.Marshal(h.Records)
 	if err != nil {
-		log.Printf("Err marshalling history: %s", err)
+		return errors.Wrapf(err, "error marshaling history")
 	}
-	path, err := historyPath()
-	if err != nil {
-		log.Printf("Error finding user home dir: %s", err)
-		return
+	if err := ioutil.WriteFile(h.FilePath, body, 0755); err != nil {
+		return errors.Wrapf(err, "error writing history to the file")
 	}
-	if err := ioutil.WriteFile(path, body, 0755); err != nil {
-		log.Printf("Error writing history: %s", err)
-	}
+
+	return nil
+}
+
+// Len returns amount of records in history
+func (h IOHistory) Len() int { return len(h.Records) }
+
+// Add appends record into history's records
+func (h *IOHistory) Add(record string) {
+	h.Records = append(h.Records, record)
 }
