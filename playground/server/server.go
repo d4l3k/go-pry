@@ -5,7 +5,6 @@ import (
 	"encoding/hex"
 	"flag"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
@@ -60,25 +59,10 @@ func generateBundle(w http.ResponseWriter, r *http.Request, packages string) (re
 		return err
 	}
 
-	dir, err := ioutil.TempDir("", "pry-playground-gopath")
-	if err != nil {
-		return err
-	}
-	defer func() {
-		if err := os.RemoveAll(dir); err != nil {
-			if retErr == nil {
-				retErr = err
-			}
-		}
-	}()
-
-	env := []string{
-		fmt.Sprintf("GOPATH=%s", dir),
-	}
-
 	g := generate.NewGenerator(false)
-	g.Build.GOPATH = dir
 	g.Build.CgoEnabled = false
+
+	env := os.Environ()
 
 	for _, pkg := range append([]string{"github.com/d4l3k/go-pry/pry"}, pkgs...) {
 		if err := g.ExecuteGoCmd(r.Context(), []string{
