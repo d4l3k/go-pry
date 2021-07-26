@@ -6,6 +6,6 @@ nprogress@^0.2.0:
   version "0.2.0"
   resolved "https://registry.yarnpkg.com/nprogress/-/nprogress-0.2.0.tgz#cb8f34c53213d895723fcbab907e9422adbcafb1"
 
-xterm@^3.7.0:
-  version "3.7.0"
-  resolved "https://registry.yarnpkg.com/xterm/-/xterm-3.7.0.tgz#b3eb1335dc04b92abe361711731d3b661e13db17"
+xterm@^3.8.1:
+  version "3.8.1"
+  resolved "https://registry.yarnpkg.com/xterm/-/xterm-3.8.1.tgz#0beabaccdc23bd3ab2397c5129ed9b06b0abb167"
