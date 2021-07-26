@@ -77,8 +77,7 @@ func generateBundle(w http.ResponseWriter, r *http.Request, packages string) (re
 	}
 
 	g := generate.NewGenerator(false)
-	g.Build.GOPATH = dir
-	g.Build.CgoEnabled = false
+	g.Config.Env = append(os.Environ(), "CGO_ENABLED=0")
 
 	for _, pkg := range append([]string{"github.com/d4l3k/go-pry/pry"}, pkgs...) {
 		if err := g.ExecuteGoCmd(r.Context(), []string{

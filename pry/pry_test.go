@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"log"
 	"math/rand"
 	"os"
 	"path"
@@ -150,7 +151,13 @@ func testPryApply(t testing.TB) *testPryEnv {
 	tty := makeTestTTY()
 	scope := NewScope()
 
-	dir, err := ioutil.TempDir("", "go-pry-test")
+	wd, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	log.Printf("cwd %+v", wd)
+
+	dir, err := ioutil.TempDir(wd, "go-pry-test")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -162,7 +169,7 @@ func testPryApply(t testing.TB) *testPryEnv {
 	if err != nil {
 		t.Fatal(err)
 	}
-	file.Write([]byte(
+	if _, err := file.Write([]byte(
 		`package main
 
 import "github.com/d4l3k/go-pry/pry"
@@ -171,7 +178,9 @@ func main() {
 	pry.Pry()
 }
 `,
-	))
+	)); err != nil {
+		t.Fatal(err)
+	}
 	file.Close()
 
 	filePath := file.Name()
@@ -179,7 +188,7 @@ func main() {
 
 	go func() {
 		if err := apply(scope, &stdout, tty, filePath, filePath, lineNum); err != nil {
-			panic(err)
+			log.Fatalf("%+v", err)
 		}
 	}()
 
@@ -199,8 +208,8 @@ func (env *testPryEnv) Output() string {
 func (env *testPryEnv) Close() {
 	env.Write([]byte("\nexit\n"))
 	env.testTTY.Close()
-	os.Remove(env.file)
-	os.Remove(env.dir)
+	os.RemoveAll(env.file)
+	os.RemoveAll(env.dir)
 }
 
 func succeedsSoon(t testing.TB, f func() error) {

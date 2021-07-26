@@ -1176,10 +1176,8 @@ func (scope *Scope) ConfigureTypes(path string, line int) error {
 		return errors.Wrapf(err, "parser.ParseDir %q", scope.path)
 	}
 
-	for _, pkg := range f {
-		for name, file := range pkg.Files {
-			scope.Files[name] = file
-		}
+	for name, file := range f {
+		scope.Files[name] = file
 	}
 
 	_, errs := scope.TypeCheck()
@@ -1265,7 +1263,8 @@ func (scope *Scope) TypeCheck() (*types.Info, []error) {
 	var errs []error
 	scope.config.Error = func(err error) {
 		if !strings.HasSuffix(err.Error(), "not used") {
-			errs = append(errs, errors.New(strings.TrimPrefix(err.Error(), scope.path)))
+			err := errors.New(strings.TrimPrefix(err.Error(), scope.path))
+			errs = append(errs, errors.Wrapf(err, "path %q", scope.path))
 		}
 	}
 	info := &types.Info{}
@@ -1273,9 +1272,10 @@ func (scope *Scope) TypeCheck() (*types.Info, []error) {
 	for _, f := range scope.Files {
 		files = append(files, f)
 	}
-	// Not checking errors here since they should be reported via the Error
-	// function above.
-	scope.config.Check(filepath.Dir(scope.path), scope.fset, files, info)
+	// these errors should be reported via the error reporter above
+	if _, err := scope.config.Check(filepath.Dir(scope.path), scope.fset, files, info); errs == nil && err != nil {
+		return nil, []error{err}
+	}
 	return info, errs
 }
 

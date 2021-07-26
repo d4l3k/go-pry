@@ -14,18 +14,22 @@ func readFile(path string) ([]byte, error) {
 	path = filepath.Join("bundles", filepath.Base(path))
 
 	r, w := io.Pipe()
-	var respCB js.Callback
-	respCB = js.NewCallback(func(args []js.Value) {
+	var respCB js.Func
+	respCB = js.FuncOf(func(this js.Value, args []js.Value) interface{} {
 		defer respCB.Release()
 
-		var textCB js.Callback
-		textCB = js.NewCallback(func(args []js.Value) {
+		var textCB js.Func
+		textCB = js.FuncOf(func(this js.Value, args []js.Value) interface{} {
 			defer textCB.Release()
 
 			w.Write([]byte(args[0].String()))
 			w.Close()
+
+			return nil
 		})
 		args[0].Call("text").Call("then", textCB)
+
+		return nil
 	})
 	js.Global().Call("fetch", path).Call("then", respCB)
 	return ioutil.ReadAll(r)

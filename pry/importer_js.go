@@ -8,8 +8,14 @@ import (
 	"go/types"
 )
 
-func (s *Scope) parseDir() (map[string]*ast.Package, error) {
-	return defaultImporter.Dir, nil
+func (s *Scope) parseDir() (map[string]*ast.File, error) {
+	files := map[string]*ast.File{}
+	for _, p := range defaultImporter.Dir {
+		for name, file := range p.Files {
+			files[name] = file
+		}
+	}
+	return files, nil
 }
 
 func getImporter() types.Importer {

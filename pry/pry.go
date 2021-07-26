@@ -3,6 +3,7 @@ package pry
 import (
 	"fmt"
 	"io"
+	"log"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -25,7 +26,7 @@ func Apply(scope *Scope) {
 	filePath := filepath.Dir(filePathRaw) + "/." + filepath.Base(filePathRaw) + "pry"
 
 	if err := apply(scope, out, tty, filePath, filePathRaw, lineNum); err != nil {
-		panic(err)
+		log.Fatalf("%+v", err)
 	}
 }
 
