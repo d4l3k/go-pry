@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/d4l3k/go-pry/generate"
+	"github.com/pkg/errors"
 )
 
 func main() {
@@ -116,7 +117,7 @@ func run() error {
 			}
 			file, err := g.InjectPry(path)
 			if err != nil {
-				return err
+				return errors.Wrap(err, "inject")
 			}
 			if file != "" {
 				modifiedFiles = append(modifiedFiles, path)

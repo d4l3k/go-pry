@@ -2,3 +2,4 @@
 *.zip
 fuzz/
 *.coverprofile
+go-pry-test*

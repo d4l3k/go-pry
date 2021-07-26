@@ -17,9 +17,10 @@ func newWASMTTY() *wasmTTY {
 		term: js.Global().Get("term"),
 		r:    r,
 	}
-	cb := js.NewCallback(func(args []js.Value) {
+	cb := js.FuncOf(func(this js.Value, args []js.Value) interface{} {
 		data := args[0].String()
 		w.Write([]byte(data))
+		return nil
 	})
 	t.term.Call("on", "data", cb)
 

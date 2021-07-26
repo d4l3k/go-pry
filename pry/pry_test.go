@@ -1,13 +1,11 @@
 package pry
 
 import (
-	"fmt"
 	"io"
 	"io/ioutil"
-	"math/rand"
+	"log"
 	"os"
 	"path"
-	"path/filepath"
 	"reflect"
 	"testing"
 	"time"
@@ -16,41 +14,6 @@ import (
 	"github.com/d4l3k/go-pry/pry/safebuffer"
 	"github.com/pkg/errors"
 )
-
-func TestHistory(t *testing.T) {
-	t.Parallel()
-
-	rand.Seed(time.Now().UnixNano())
-
-	history := &IOHistory{}
-	history.FileName = ".go-pry_history_test"
-	history.FilePath = filepath.Join(os.TempDir(), history.FileName)
-
-	expected := []string{
-		"test",
-		fmt.Sprintf("rand: %d", rand.Int63()),
-	}
-	history.Add(expected[0])
-	history.Add(expected[1])
-
-	if err := history.Save(); err != nil {
-		t.Error("Failed to save history")
-	}
-
-	if err := history.Load(); err != nil {
-		t.Error("Failed to load history")
-	}
-
-	if !reflect.DeepEqual(expected, history.Records) {
-		t.Errorf("history.Load() = %+v; expected %+v", history.Records, expected)
-	}
-
-	// delete test history file
-	err := os.Remove(history.FilePath)
-	if err != nil {
-		t.Error(err)
-	}
-}
 
 func TestCLIBasicStatement(t *testing.T) {
 	t.Parallel()
@@ -150,7 +113,13 @@ func testPryApply(t testing.TB) *testPryEnv {
 	tty := makeTestTTY()
 	scope := NewScope()
 
-	dir, err := ioutil.TempDir("", "go-pry-test")
+	wd, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	log.Printf("cwd %+v", wd)
+
+	dir, err := ioutil.TempDir(wd, "go-pry-test")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -162,7 +131,7 @@ func testPryApply(t testing.TB) *testPryEnv {
 	if err != nil {
 		t.Fatal(err)
 	}
-	file.Write([]byte(
+	if _, err := file.Write([]byte(
 		`package main
 
 import "github.com/d4l3k/go-pry/pry"
@@ -171,7 +140,9 @@ func main() {
 	pry.Pry()
 }
 `,
-	))
+	)); err != nil {
+		t.Fatal(err)
+	}
 	file.Close()
 
 	filePath := file.Name()
@@ -179,7 +150,7 @@ func main() {
 
 	go func() {
 		if err := apply(scope, &stdout, tty, filePath, filePath, lineNum); err != nil {
-			panic(err)
+			log.Fatalf("%+v", err)
 		}
 	}()
 
@@ -199,8 +170,8 @@ func (env *testPryEnv) Output() string {
 func (env *testPryEnv) Close() {
 	env.Write([]byte("\nexit\n"))
 	env.testTTY.Close()
-	os.Remove(env.file)
-	os.Remove(env.dir)
+	os.RemoveAll(env.file)
+	os.RemoveAll(env.dir)
 }
 
 func succeedsSoon(t testing.TB, f func() error) {

@@ -4,32 +4,33 @@ import (
 	"context"
 	"fmt"
 	"go/ast"
-	"go/build"
 	"go/parser"
 	"go/token"
 	"io/ioutil"
 	"log"
 	"os"
 	"os/exec"
-	"path"
 	"path/filepath"
 	"reflect"
 	"strings"
 
 	"github.com/d4l3k/go-pry/pry"
 	"github.com/pkg/errors"
+	"golang.org/x/tools/go/packages"
 )
 
 type Generator struct {
 	contexts []pryContext
 	debug    bool
-	Build    build.Context
+	Config   packages.Config
 }
 
 func NewGenerator(debug bool) *Generator {
 	return &Generator{
 		debug: debug,
-		Build: build.Default,
+		Config: packages.Config{
+			Mode: packages.NeedName | packages.NeedSyntax,
+		},
 	}
 }
 
@@ -74,32 +75,28 @@ func (g *Generator) InjectPry(filePath string) (string, error) {
 		return "", err
 	}
 
+	g.Config.Dir = filepath.Dir(filePath)
+
 	packagePairs := []string{}
 	for _, imp := range f.Imports {
 		importStr := imp.Path.Value[1 : len(imp.Path.Value)-1]
 		if importStr != "../pry" {
-			dir := filepath.Dir(filePath)
-			pkg, err := g.Build.Import(importStr, dir, build.AllowBinary)
+			pkgs, err := packages.Load(&g.Config, importStr)
 			if err != nil {
 				return "", err
 			}
+			pkg := pkgs[0]
 			importName := pkg.Name
 			if imp.Name != nil {
 				importName = imp.Name.Name
 			}
-			pkgAst, err := parser.ParseDir(fset, pkg.Dir, nil, parser.ParseComments)
+			pair := "\"" + importName + "\": pry.Package{Name: \"" + pkg.Name + "\", Functions: map[string]interface{}{"
+			added := make(map[string]bool)
+			exports, err := g.GetExports(importName, pkg.Syntax, added)
 			if err != nil {
 				return "", err
 			}
-			pair := "\"" + importName + "\": pry.Package{Name: \"" + pkg.Name + "\", Functions: map[string]interface{}{"
-			added := make(map[string]bool)
-			for _, nPkg := range pkgAst {
-				exports, err := g.GetExports(importName, nPkg, added)
-				if err != nil {
-					return "", err
-				}
-				pair += exports
-			}
+			pair += exports
 			pair += "}}, "
 			packagePairs = append(packagePairs, pair)
 		}
@@ -173,24 +170,9 @@ func (g *Generator) InjectPry(filePath string) (string, error) {
 }
 
 // GetExports returns a string of gocode that represents the exports (constants/functions) of an ast.Package.
-func (g *Generator) GetExports(importName string, pkg *ast.Package, added map[string]bool) (string, error) {
-	if pkg.Name == "main" {
-		return "", nil
-	}
+func (g *Generator) GetExports(importName string, files []*ast.File, added map[string]bool) (string, error) {
 	vars := ""
-	for name, file := range pkg.Files {
-		if strings.HasSuffix(name, "_test.go") {
-			continue
-		}
-
-		match, err := g.Build.MatchFile(path.Dir(name), path.Base(name))
-		if err != nil {
-			return "", err
-		}
-		if !match {
-			continue
-		}
-
+	for _, file := range files {
 		// Print the imports from the file's AST.
 		scope := pry.NewScope()
 		for k, obj := range file.Scope.Objects {
