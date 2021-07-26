@@ -2,7 +2,7 @@
 
 go-pry - an interactive REPL for Go that allows you to drop into your code at any point.
 
-![Tests](https://github.com/d4l3k/go-pry/actions/workflows/unittest.yaml/badge.svg)
+![Tests](https://github.com/d4l3k/go-pry/actions/workflows/unittest.yml/badge.svg)
 [![GoDoc](https://godoc.org/github.com/d4l3k/go-pry/pry?status.svg)](https://godoc.org/github.com/d4l3k/go-pry/pry)
 
 ![go-pry](https://i.imgur.com/yr1BEsK.png)
