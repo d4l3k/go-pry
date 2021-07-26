@@ -19,13 +19,6 @@ jobs:
         go-version: ${{ matrix.go-version }}
     - name: Checkout code
       uses: actions/checkout@v2
-    - name: Deps
-      run: |
-        set -ex
-        if ! go get github.com/golang/tools/cmd/cover; then go get golang.org/x/tools/cmd/cover; fi
-        go get github.com/axw/gocov/gocov
-        go get github.com/modocache/gover
-        go get github.com/mattn/goveralls
     - name: Install
       run: |
         set -ex
@@ -33,9 +26,4 @@ jobs:
     - name: Test
       run: |
         set -ex
-        go test -v -race -coverprofile=pry.coverprofile ./pry
-        go test -v -race -coverprofile=generate.coverprofile ./generate
-        go test -v -race -coverprofile=main.coverprofile
-        go test -v -race -coverprofile=server.coverprofile ./playground/server
-        $HOME/gopath/bin/gover
-        $HOME/gopath/bin/goveralls -service=travis-ci -coverprofile=gover.coverprofile
+        go test -v -race . ./pry ./generate ./playground/server
