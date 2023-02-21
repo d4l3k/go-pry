@@ -236,7 +236,7 @@ func (g *Generator) GetExports(importName string, files []*ast.File, added map[s
 						}
 
 						// TODO Fix hack for very large constants
-					} else if path == "math.MaxUint64" || path == "crc64.ISO" || path == "crc64.ECMA" {
+					} else if path == "math.MaxUint64" || path == "math.MaxUint" || path == "crc64.ISO" || path == "crc64.ECMA" {
 						vars += fmt.Sprintf("uint64(%s)", path)
 					} else {
 						vars += path
